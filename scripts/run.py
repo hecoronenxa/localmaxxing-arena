@@ -133,14 +133,16 @@ def main():
         part = {"job_name": run_dir.name, "attempts": attempts, "n_concurrent": n_concurrent,
                 "config": "harbor-config-p1.json", "started_at": now, "host": meta["host"]}
     job_name = part["job_name"]
-    ev_dir = Path("evidence") / args.bench / job_name  # relative to ROOT, the cwd Harbor runs in
+    # Absolute: Harbor resolves a relative jobs_dir against each task's compose directory when it copies
+    # artifacts out of the container, which fails and can leave the verifier without the agent's files.
+    ev_dir = ROOT / "evidence" / args.bench / job_name
     cfg = harbor_config(bench, model, part["attempts"], part["n_concurrent"], job_name, ev_dir / "jobs")
     if args.dry_run:
         print(json.dumps(cfg, indent=2))
         return
 
     run_dir.mkdir(parents=True, exist_ok=True)
-    (ROOT / ev_dir).mkdir(parents=True, exist_ok=True)
+    ev_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / part["config"]).write_text(json.dumps(cfg, indent=2) + "\n")
     if not args.resume:
         meta["parts"].append(part)
@@ -157,7 +159,7 @@ def main():
     cmd = ["harbor", "job", "resume", "-p", str(ev_dir / "jobs" / job_name)] if args.resume else \
           ["harbor", "run", "-c", str(run_dir / part["config"]), "-y", "-q"]
     print(" ".join(cmd), flush=True)
-    with open(ROOT / ev_dir / "harbor.log", "a") as log:
+    with open(ev_dir / "harbor.log", "a") as log:
         rc = subprocess.run(cmd, env=env, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT).returncode
     print(f"harbor exited {rc}", flush=True)
     collect = [sys.executable, str(ROOT / "scripts/collect.py"), str(run_dir)] + (["--pack"] if rc == 0 else [])

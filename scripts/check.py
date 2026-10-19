@@ -48,10 +48,13 @@ def check_run(run_dir, run_py):
             errs.append(f"recipe {key} changed since the run ({ran.get(key)!r} -> {recipe.get(key)!r}); use a new recipe id")
 
     for part in meta["parts"]:
-        expected = run_py.harbor_config(spec, ran, part["attempts"], part["n_concurrent"], part["job_name"],
-                                        Path("evidence") / bench / part["job_name"] / "jobs")
         config = run_dir / part["config"]
-        if not config.exists() or json.loads(config.read_text()) != expected:
+        cfg = json.loads(config.read_text()) if config.exists() else {}
+        jobs_dir = Path(cfg.get("jobs_dir", ""))  # absolute path on the runner host
+        if jobs_dir.parts[-4:] != ("evidence", bench, part["job_name"], "jobs"):
+            errs.append(f"{part['config']}: jobs_dir {cfg.get('jobs_dir')!r} is not .../evidence/{bench}/{part['job_name']}/jobs")
+        expected = run_py.harbor_config(spec, ran, part["attempts"], part["n_concurrent"], part["job_name"], jobs_dir)
+        if cfg != expected:
             errs.append(f"{part['config']} is not what scripts/run.py generates from bench.toml and recipe.toml")
         ev = part.get("evidence") or {}
         if not (ev.get("archive") and ev.get("sha256") and ev.get("bytes")):

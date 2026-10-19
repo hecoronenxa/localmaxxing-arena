@@ -52,7 +52,9 @@ cuts long requests.
 ## 2. Run it
 
 Needs Docker (Colima, OrbStack or Docker Desktop) and [uv](https://docs.astral.sh/uv/); each bench
-README lists its own tools (Terminal-Bench 4: `uv tool install harbor==0.24.0`).
+README lists its own tools (Terminal-Bench 4: `uv tool install harbor==0.24.0`). Keep the clone in a
+directory Docker can mount (Colima shares only your home directory by default, not `/tmp`): Harbor
+copies the agent's files from the task container into `evidence/` and on to the verifier.
 
 ```bash
 uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1   # one result: the cheapest useful run
