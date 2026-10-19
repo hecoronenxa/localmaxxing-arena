@@ -1,0 +1,14 @@
+id = "glm-5.3-flash@exl3-4bpw-tensorfold-2xspark"
+role = "local"                     # a recipe you can run at home
+model_family = "GLM-5.3-Flash"
+display_name = "GLM-5.3-Flash · Mia EXL3 · TensorFold TP2"
+weights = "EXL3 4bpw"               # short, for the leaderboard
+hardware = "2× DGX Spark"
+weights_detail = "Mia-AiLab/GLM-5.3-Flash-EXL3-4bpw-TensorFold @ 078455ff, dense fp8"
+serving = "TensorFold (Python CUDA) v0.6.0-e66c657a433d + patch layer 0112/0113/0115; recipe MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold @ 3fd60df; PARALLEL=8 DENSE=fp8"
+hardware_detail = "2× NVIDIA DGX Spark (GB10, 128 GB), CX7 RoCE, GPU clocks locked 0-2200 MHz"
+
+model = "openai/glm-5.3-flash"
+api_base = "http://192.168.0.112:8888/v1"
+api_key_env = ""                   # server takes no key
+n_concurrent = 8                   # = server PARALLEL
