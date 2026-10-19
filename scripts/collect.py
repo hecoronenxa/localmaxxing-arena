@@ -5,12 +5,12 @@
 """Extract the raw metrics of a run from its Harbor output (evidence) into the repo.
 
     uv run scripts/collect.py runs/<bench>/<run dir>           # refresh trials.jsonl (works mid-run)
-    uv run scripts/collect.py runs/<bench>/<run dir> --pack    # also archive the evidence, record its sha256
+    uv run scripts/collect.py runs/<bench>/<run dir> --pack    # also archive finished parts' evidence
 
-Reads evidence/<bench>/<run>/ (git-ignored: trajectories, terminal recordings, verifier logs) and writes
-runs/<bench>/<run>/trials.jsonl, one line of core stats per finished trial. With --pack, writes
-evidence/<bench>/<run>.tar.gz and records its name, size and sha256 under "evidence" in run.json; upload
-the archive anywhere and put the link in evidence.url.
+Reads evidence/<bench>/<job>/ for every part of the run (git-ignored: trajectories, terminal recordings,
+verifier logs) and writes runs/<bench>/<run>/trials.jsonl, one line of core stats per finished trial.
+With --pack, writes evidence/<bench>/<job>.tar.gz per finished part and records its name, size and
+sha256 under the part's "evidence" in run.json; attach the archives to the PR.
 """
 import argparse, hashlib, json, statistics, subprocess, sys, tomllib
 from datetime import datetime
@@ -101,35 +101,50 @@ def trial_row(trial_dir, reply_cap):
     return row
 
 
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir", type=Path)
-    ap.add_argument("--pack", action="store_true")
+    ap.add_argument("--pack", action="store_true", help="archive finished parts that are not packed yet")
     args = ap.parse_args()
     run_dir = args.run_dir.resolve()
     meta = json.loads((run_dir / "run.json").read_text())
-    ev = ROOT / "evidence" / meta["bench"] / meta["job_name"]
     reply_cap = tomllib.loads((run_dir / "bench.toml").read_text())["agent"]["max_output_tokens"]
-    rows = [row for f in sorted(ev.glob("jobs/*/*/result.json")) if (row := trial_row(f.parent, reply_cap))]
+    old = [json.loads(line) for line in (run_dir / "trials.jsonl").read_text().splitlines() if line.strip()] \
+        if (run_dir / "trials.jsonl").exists() else []
+    rows = []
+    for part in meta["parts"]:
+        ev = ROOT / "evidence" / meta["bench"] / part["job_name"]
+        if not ev.exists():
+            # Another contributor's part: no local evidence, keep its committed metrics as they are.
+            kept = [r for r in old if r.get("part", meta["parts"][0]["job_name"]) == part["job_name"]]
+            rows += kept
+            print(f"{part['job_name']}: no local evidence, kept {len(kept)} committed trials")
+            continue
+        part_rows = [row for f in sorted(ev.glob("jobs/*/*/result.json")) if (row := trial_row(f.parent, reply_cap))]
+        for row in part_rows:
+            row["part"] = part["job_name"]
+        rows += part_rows
+        job = next(ev.glob("jobs/*/result.json"), None)
+        part["finished"] = bool(job and json.loads(job.read_text()).get("finished_at"))
+        if args.pack and part["finished"] and not part.get("evidence"):
+            archive = ev.parent / f"{ev.name}.tar.gz"
+            subprocess.run(["tar", "-czf", str(archive), "-C", str(ev.parent), ev.name], check=True)
+            part["evidence"] = {"archive": archive.name, "bytes": archive.stat().st_size,
+                                "sha256": sha256(archive), "url": None}
+            print(f"evidence {archive} {archive.stat().st_size / 1e6:.1f} MB sha256 {part['evidence']['sha256']}")
+        print(f"{part['job_name']}: {len(part_rows)} finished trials (job finished: {part['finished']})")
     (run_dir / "trials.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
-    job = next(ev.glob("jobs/*/result.json"), None)
-    finished = bool(job and json.loads(job.read_text()).get("finished_at"))
-    meta["finished"] = finished
-    print(f"{len(rows)} finished trials -> {run_dir}/trials.jsonl (job finished: {finished})")
-
-    if args.pack:
-        if not finished:
-            sys.exit("job not finished; not packing")
-        archive = ev.parent / f"{ev.name}.tar.gz"
-        subprocess.run(["tar", "-czf", str(archive), "-C", str(ev.parent), ev.name], check=True)
-        h = hashlib.sha256()
-        with open(archive, "rb") as f:
-            for chunk in iter(lambda: f.read(1 << 20), b""):
-                h.update(chunk)
-        meta["evidence"] = {"archive": archive.name, "bytes": archive.stat().st_size,
-                            "sha256": h.hexdigest(), "url": (meta.get("evidence") or {}).get("url")}
-        print(f"evidence {archive} {archive.stat().st_size / 1e6:.1f} MB sha256 {h.hexdigest()}")
+    meta["finished"] = all(p["finished"] for p in meta["parts"])
     (run_dir / "run.json").write_text(json.dumps(meta, indent=2) + "\n")
+    print(f"{len(rows)} trials -> {run_dir}/trials.jsonl (run finished: {meta['finished']})")
 
 
 if __name__ == "__main__":

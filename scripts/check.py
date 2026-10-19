@@ -7,9 +7,9 @@
     uv run scripts/check.py
 
 A run passes when its bench.toml copy is identical to benches/<bench>/bench.toml (benchmarks are
-frozen), its recipe still exists with the same id, model and api_base, its harbor-config.json is exactly
-what scripts/run.py generates from them, it ran on the bench's Harbor version, every trial used the
-pinned task content, trials.jsonl covers every task `attempts` times, the evidence archive is recorded,
+frozen), its recipe still exists with the same id, model and api_base, each part's harbor-config-p<N>.json is
+exactly what scripts/run.py generates from them, it ran on the bench's Harbor version, every trial used the
+pinned task content, trials.jsonl covers every task `attempts` times, every part is finished with its evidence archive recorded,
 and the leaderboard renders. Every leaderboard column after the first also needs full runs from at
 least two anchor recipes. Generated files are not checked: the publish workflow rebuilds them on main.
 """
@@ -47,10 +47,19 @@ def check_run(run_dir, run_py):
         if ran.get(key) != recipe.get(key):
             errs.append(f"recipe {key} changed since the run ({ran.get(key)!r} -> {recipe.get(key)!r}); use a new recipe id")
 
-    expected = run_py.harbor_config(spec, ran, meta["attempts"], meta["n_concurrent"], meta["job_name"],
-                                    Path("evidence") / bench / meta["job_name"] / "jobs")
-    if json.loads((run_dir / "harbor-config.json").read_text()) != expected:
-        errs.append("harbor-config.json is not what scripts/run.py generates from bench.toml and recipe.toml")
+    for part in meta["parts"]:
+        expected = run_py.harbor_config(spec, ran, part["attempts"], part["n_concurrent"], part["job_name"],
+                                        Path("evidence") / bench / part["job_name"] / "jobs")
+        config = run_dir / part["config"]
+        if not config.exists() or json.loads(config.read_text()) != expected:
+            errs.append(f"{part['config']} is not what scripts/run.py generates from bench.toml and recipe.toml")
+        ev = part.get("evidence") or {}
+        if not (ev.get("archive") and ev.get("sha256") and ev.get("bytes")):
+            errs.append(f"{part['job_name']}: evidence not packed (scripts/collect.py --pack)")
+        if not part.get("finished"):
+            errs.append(f"{part['job_name']}: Harbor job not finished")
+    if meta["attempts"] != sum(p["attempts"] for p in meta["parts"]):
+        errs.append("attempts is not the sum of the parts' attempts")
     if spec["harbor_version"] not in meta.get("harbor", ""):
         errs.append(f"ran on {meta.get('harbor')!r}, bench requires Harbor {spec['harbor_version']}")
     if meta.get("smoke") != (meta["attempts"] != spec["suite"]["n_attempts"]):
@@ -71,11 +80,6 @@ def check_run(run_dir, run_py):
             errs.append(f"{r.get('trial')}: reward missing")
         if pins.get(r.get("task")) and r.get("task_ref") != pins[r["task"]]:
             errs.append(f"{r.get('trial')}: task content {r.get('task_ref')} is not the pinned {pins[r['task']]}")
-    ev = meta.get("evidence") or {}
-    if not (ev.get("archive") and ev.get("sha256") and ev.get("bytes")):
-        errs.append("evidence not packed (scripts/collect.py --pack)")
-    if not meta.get("finished"):
-        errs.append("Harbor job not finished")
     return errs
 
 

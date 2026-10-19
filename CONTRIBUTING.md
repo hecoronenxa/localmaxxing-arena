@@ -24,15 +24,23 @@ Needs Docker (Colima, OrbStack or Docker Desktop) and [uv](https://docs.astral.s
 README lists its own tools.
 
 ```bash
-uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1   # smoke
-uv run scripts/run.py <bench> recipes/<id>.toml                # full: the bench's attempts
-uv run scripts/run.py <bench> recipes/<id>.toml --resume runs/<bench>/<run dir>
-uv run scripts/collect.py runs/<bench>/<run dir>               # refresh raw metrics mid-run
+uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1   # start here: one attempt per task
+uv run scripts/run.py <bench> recipes/<id>.toml                # or all of the bench's attempts at once
+uv run scripts/run.py <bench> recipes/<id>.toml --extend runs/<bench>/<run> --attempts 2   # add attempts
+uv run scripts/run.py <bench> recipes/<id>.toml --resume runs/<bench>/<run>   # continue an interrupted part
+uv run scripts/collect.py runs/<bench>/<run>                   # refresh raw metrics mid-run
 uv run scripts/summarize.py                                    # preview the generated tables
 uv run scripts/check.py                                        # what CI checks on a PR
 ```
 
 `--n-concurrent N` lowers parallelism when the runner host has less room than the endpoint.
+
+**Start with k=1, extend later.** A k=1 run (one attempt per task) is a valid submission: it ranks
+with a wider interval and is tagged *k=1/3* on the leaderboard. Anyone can later add attempts to an
+existing run with `--extend` on their own machine, against an endpoint serving the same recipe: each
+extension is a new *part* of the same run (its own Harbor job, config and evidence archive), with the
+same frozen benchmark and Harbor version. Trials from earlier parts are kept from `trials.jsonl`, so
+you don't need their evidence. A run can't go past the bench's `n_attempts`.
 
 ## 3. What gets committed
 
@@ -44,13 +52,13 @@ quirks (a recipe that keeps hitting the reply cap, fails to parse, or never decl
 Each run's `STATS.md` breaks these down per task.
 
 **Evidence** (Harbor's full output: agent trajectories with reasoning, terminal recordings, verifier
-logs) stays out of git. `run.py` writes it to `evidence/<bench>/<run>/` (git-ignored) and packs it to
-`evidence/<bench>/<run>.tar.gz`, recording size and sha256 in `run.json`. The archive goes in the PR.
+logs) stays out of git. `run.py` writes it to `evidence/<bench>/<job>/` (git-ignored) and packs it to
+`evidence/<bench>/<job>.tar.gz` (one per part), recording size and sha256 in `run.json`. The archive goes in the PR.
 
 ## 4. Open the pull request
 
 A PR carries raw data only: the recipe file (if new) and `runs/<bench>/<run>/` (`run.json`,
-`recipe.toml`, `bench.toml`, `harbor-config.json`, `trials.jsonl`). Don't commit the README leaderboard,
+`recipe.toml`, `bench.toml`, `harbor-config-p<N>.json`, `trials.jsonl`). Don't commit the README leaderboard,
 `benches/<bench>/RESULTS.md` or `STATS.md`; the publish workflow rebuilds them after the merge, so
 concurrent PRs never conflict.
 
@@ -61,10 +69,11 @@ git checkout -b run/<bench>/<recipe id>
 git add recipes/<id>.toml runs/<bench>/<run>/
 ```
 
-Open the PR (the template asks for the score and the evidence), then attach
-`evidence/<bench>/<run>.tar.gz` to the description or a comment. CI runs `check.py`: the benchmark is
+Open the PR (the template asks for the score and the evidence), then attach the new part's
+`evidence/<bench>/<job>.tar.gz` to the description or a comment. CI runs `check.py`: the benchmark is
 unchanged, the recipe still matches, the Harbor config is exactly what `run.py` generates, every trial
-used the pinned task content, every task ran `attempts` times, and the evidence archive is recorded.
+used the pinned task content, every task ran `attempts` times, and every part is finished with its
+evidence archive recorded.
 Reviewers compare the attached archive's sha256 with `run.json` and spot-check trajectories. After the
 merge, `.github/workflows/publish.yml` validates `main`, regenerates the tables and commits them.
 
@@ -122,11 +131,11 @@ scripts/summarize.py               runs/ -> README leaderboard, benches/*/RESULT
 scripts/rating.py                  the rating fit (Rasch / Bradley-Terry, no dependencies)
 scripts/check.py                   PR validation (CI)
 .github/workflows/                 check.yml on PRs, publish.yml after merge
-runs/<bench>/<date>_<recipe>[_k<n>]/      in git
-  run.json                         what ran: bench, recipe, Harbor version, runner host, evidence sha256
+runs/<bench>/<date>_<recipe>/      in git
+  run.json                         what ran: bench, recipe, Harbor version, parts (host, evidence sha256)
   recipe.toml, bench.toml          copies as of the run
-  harbor-config.json               generated Harbor config (no secrets)
+  harbor-config-p<N>.json          generated Harbor config per part (no secrets)
   trials.jsonl                     raw metrics, one trial per line
   STATS.md                         generated after merge: per-task breakdown
-evidence/<bench>/<run>/ + .tar.gz  git-ignored; attached to the PR
+evidence/<bench>/<job>/ + .tar.gz  git-ignored, one per part; attached to the PR that adds the part
 ```
