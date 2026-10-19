@@ -11,7 +11,7 @@
 
 Every run is a standalone contribution; scripts/summarize.py pools all runs of a recipe on a bench, so
 more attempts later are simply another run (by anyone, on any host). --resume continues an interrupted
-run.
+run (inspect: re-runs only the tasks without a clean sample, into another log in the same directory).
 
     runs/<bench>/<run>/          in git: run.json (bench, recipe, host, versions, job),
                                  recipe.toml, bench.toml, <runner>-config-p1.json, trials.jsonl
@@ -100,6 +100,16 @@ def inspect_config(bench, model, attempts, n_concurrent, job_name, log_dir):
         "--display", "plain",
     ]
     return {"job_name": job_name, "log_dir": str(log_dir), "api_base": model["api_base"], "command": cmd}
+
+
+def inspect_missing(log_dir, tasks, attempts):
+    """The bench tasks that lack a sample without error for some epoch, across every log in log_dir."""
+    done = set()
+    for f in sorted(Path(log_dir).glob("*.json")):
+        for smp in json.loads(f.read_text()).get("samples") or []:
+            if not smp.get("error") and smp.get("scores"):
+                done.add((smp["id"], smp.get("epoch", 1)))
+    return [t for t in tasks if any((t, e) not in done for e in range(1, attempts + 1))]
 
 
 def harness_version(bench):
@@ -208,14 +218,13 @@ def main():
     else:
         env["ARENA_BASE_URL"], env["ARENA_API_KEY"] = model["api_base"], env["OPENAI_API_KEY"]
         cmd = cfg["command"]
-        if args.resume:  # re-run the samples that did not finish, into a new log next to the old one
-            logs = sorted((ev_dir / "logs").glob("*.json"))
-            if not logs:
-                sys.exit(f"no inspect log in {ev_dir / 'logs'} to resume")
-            i = cmd.index("eval")
-            cmd = cmd[:i] + ["eval-retry", str(logs[-1]), "--max-connections", str(part["n_concurrent"]),
-                             "--max-samples", str(part["n_concurrent"]), "--no-fail-on-error",
-                             "--log-format", "json", "--log-dir", str(ev_dir / "logs"), "--display", "plain"]
+        if args.resume:  # re-run only the tasks with no clean sample yet, into a new log next to the old ones
+            missing = inspect_missing(ev_dir / "logs", bench["suite"]["tasks"], part["attempts"])
+            if not missing:
+                sys.exit(f"every task already has a clean sample in {ev_dir / 'logs'}")
+            print(f"resuming {len(missing)} of {len(bench['suite']['tasks'])} tasks", flush=True)
+            cmd = list(cmd)
+            cmd[cmd.index("--sample-id") + 1] = ",".join(missing)
     print(" ".join(cmd), flush=True)
     with open(ev_dir / f"{bench['runner']}.log", "a") as log:
         rc = subprocess.run(cmd, env=env, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT).returncode

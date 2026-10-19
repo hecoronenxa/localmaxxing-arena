@@ -10,8 +10,9 @@
 
     uv run benches/bfcl-100/select.py
 
-Loads inspect_evals' BFCL (which pins the upstream gorilla data at commit dac44e7) for the four hard
-multi-turn categories, sorts each category's sample ids, draws 25 per category with random.Random(SEED),
+Loads inspect_evals' BFCL (which pins the upstream gorilla data at commit dac44e7) for four
+multi-turn categories (base, missing function, missing parameter, long context), sorts each category's
+sample ids, draws 25 per category with random.Random(SEED),
 and prints the [suite] task list plus a sha256 per task over its canonical content (input, target,
 metadata without the run-time model_* fields; message ids and null fields dropped). scripts/collect.py computes the same digest from each
 sample in a run's log, so CI can tell that a run answered exactly these tasks.
@@ -20,7 +21,7 @@ import hashlib, json, random, re
 
 SEED = 100
 PER_CATEGORY = 25
-CATEGORIES = ["multi_turn_miss_func", "multi_turn_miss_param", "multi_turn_long_context", "multi_turn_composite"]
+CATEGORIES = ["multi_turn_base", "multi_turn_miss_func", "multi_turn_miss_param", "multi_turn_long_context"]
 
 
 def canon(x):

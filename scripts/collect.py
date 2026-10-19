@@ -126,16 +126,19 @@ def reward_of(sample):
     return float(v or 0.0)
 
 
-def inspect_rows(ev, reply_cap, digest):
-    """One row per finished sample epoch over every log in ev/logs (a resumed run has several; the
-    newest log wins for a sample it re-ran). Returns (rows, finished)."""
+def inspect_rows(ev, reply_cap, digest, tasks, attempts):
+    """One row per finished sample epoch of the bench's tasks over every log in ev/logs (a resumed run
+    has several; the newest log wins for a sample it re-ran). Finished: the newest log completed and
+    every task has every epoch. Returns (rows, finished)."""
     logs = sorted((ev / "logs").glob("*.json"))
-    samples, finished = {}, False
+    samples, status = {}, None
     for f in logs:
         log = json.loads(f.read_text())
         for smp in log.get("samples") or []:
-            samples[(smp["id"], smp.get("epoch", 1))] = smp
-        finished = log.get("status") == "success"  # the newest log decides; cancelled/error -> run.py --resume
+            if smp["id"] in tasks:
+                samples[(smp["id"], smp.get("epoch", 1))] = smp
+        status = log.get("status")  # cancelled/error -> run.py --resume
+    finished = status == "success" and all((t, e) in samples for t in tasks for e in range(1, attempts + 1))
     rows = []
     for (sid, epoch), smp in sorted(samples.items(), key=lambda kv: (str(kv[0][0]), kv[0][1])):
         usage = list((smp.get("model_usage") or {}).values())
@@ -223,7 +226,7 @@ def main():
             print(f"{part['job_name']}: no local evidence, kept {len(kept)} committed trials")
             continue
         if runner == "inspect":
-            part_rows, part["finished"] = inspect_rows(ev, reply_cap, digest)
+            part_rows, part["finished"] = inspect_rows(ev, reply_cap, digest, set(spec["suite"]["tasks"]), part["attempts"])
         else:
             part_rows = [row for f in sorted(ev.glob("jobs/*/*/result.json")) if (row := trial_row(f.parent, reply_cap))]
             job = next(ev.glob("jobs/*/result.json"), None)

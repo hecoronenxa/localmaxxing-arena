@@ -26,7 +26,7 @@ _No results yet._
 
 | Bench | What it measures | Definition | Results |
 |---|---|---|---|
-| [bfcl-100](benches/bfcl-100/) | Multi-turn tool use: 100 BFCL v3 multi-turn tasks (missing function, missing parameter, long context, composite), low reasoning | [bench.toml](benches/bfcl-100/bench.toml) | [RESULTS.md](benches/bfcl-100/RESULTS.md) |
+| [bfcl-100](benches/bfcl-100/) | Multi-turn tool use: 100 BFCL v3 multi-turn tasks (base, missing function, missing parameter, long context), low reasoning | [bench.toml](benches/bfcl-100/bench.toml) | [RESULTS.md](benches/bfcl-100/RESULTS.md) |
 
 ## Contributing
 
