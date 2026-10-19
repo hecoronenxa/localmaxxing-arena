@@ -84,19 +84,37 @@ BEHAVIOUR = [
     ("No task_complete", lambda t: str(sum(1 for r in t if not r.get("task_complete_calls")))),
 ]
 BEHAVIOUR_NOTE = (
-    "Per-trial averages unless noted. *Reasoning tok (est)* splits output tokens by the character share of "
+    "Per-trial averages unless noted. *Reasoning tok (est)* (Harbor runs) splits output tokens by the character share of "
     "reasoning vs visible output (Harbor does not keep the provider's reasoning-token count). *Max prompt / "
     "Max reply* = largest single LLM call. *Out tok/s* = output tokens / time inside LLM calls (includes "
     "prefill and queueing). *Parse err*, *Over reply cap* (reply cut at `max_tokens`; the actions in it were not run), *Summarized* (context "
     "summarizations) and *No task_complete* (trial ended without the agent declaring completion) are totals.")
 
 
+# The trial field each behaviour column reads; a column is shown only if some trial has that field
+# (Harbor and inspect runs record different things).
+BEHAVIOUR_KEYS = {
+    "LLM calls": "llm_calls", "Tool calls": "tool_calls", "Output tok": "output_tokens",
+    "Reasoning tok (est)": "reasoning_tokens_est", "Reasoning share": "reasoning_share", "Input tok": "input_tokens",
+    "Cache hit": "cached_tokens", "Max prompt": "max_prompt_tokens", "Max reply": "max_output_tokens",
+    "Out tok/s": "llm_s", "LLM share of agent time": "llm_s", "Agent min": "agent_s", "Parse err": "parse_errors",
+    "Over reply cap": "replies_over_cap", "Summarized": "summarizations", "No task_complete": "task_complete_calls",
+}
+
+
 def behaviour_table(first_header, label_rows):
-    out = ["| " + " | ".join([first_header] + [h for h, _ in BEHAVIOUR]) + " |",
-           "|---|" + "---|" * len(BEHAVIOUR)]
+    seen = [t for _, trials in label_rows for t in trials]
+    cols = [(h, f) for h, f in BEHAVIOUR if any(t.get(BEHAVIOUR_KEYS[h]) is not None for t in seen)]
+    out = ["| " + " | ".join([first_header] + [h for h, _ in cols]) + " |",
+           "|---|" + "---|" * len(cols)]
     for label, trials in label_rows:
-        out.append("| " + " | ".join([label] + [f(trials) if trials else "·" for _, f in BEHAVIOUR]) + " |")
+        out.append("| " + " | ".join([label] + [f(trials) if trials else "·" for _, f in cols]) + " |")
     return out
+
+
+def harness_label(meta):
+    """Short harness name for tables: the Harbor version, or the first inspect requirement."""
+    return (meta.get("harness") or meta.get("harbor") or "-").split(" + ")[0]
 
 
 def recipe_of(meta):
@@ -159,7 +177,7 @@ def recipe_page(bench, spec, e):
              f"(bench defines {spec['suite']['n_attempts']}), {e['errors']} errored", "",
              "## Runs", "",
              "Each run is one contribution. A run whose score sits far from the others deserves a look at its evidence.", "",
-             "| Run | k | Score | Trials · errored | Harbor | Runner | Evidence (sha256) |", "|---|---|---|---|---|---|---|"]
+             "| Run | k | Score | Trials · errored | Harness | Runner | Evidence (sha256) |", "|---|---|---|---|---|---|---|"]
     for meta, run_dir, trials in e["runs"]:
         sc = score(trials)
         host = meta.get("host") or {}
@@ -167,7 +185,7 @@ def recipe_page(bench, spec, e):
                        f"`{(p.get('evidence') or {}).get('sha256', '-')[:12]}`" for p in meta["parts"])
         lines.append(f"| [{run_dir.name}]({link(run_dir.relative_to(ROOT) / 'run.json', page)}) | {meta['attempts']} | "
                      f"{sc['score']:.1%} | {len(trials)}/{meta['attempts'] * len(tasks)} · {sc['errors']} | "
-                     f"{meta['harbor']} | {host.get('machine', '-')} | {ev} |")
+                     f"{harness_label(meta)} | {host.get('machine', '-')} | {ev} |")
     lines += ["", "## Per task", "", "| Task | Passes | Mean reward | Exceptions |", "|---|---|---|---|"]
     for task in tasks:
         tt = [t for t in e["trials"] if t["task"] == task]

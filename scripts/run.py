@@ -2,7 +2,8 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Run one recipe on one benchmark (benches/<bench>/bench.toml).
+"""Run one recipe on one benchmark (benches/<bench>/bench.toml), through the bench's runner: Harbor
+(container tasks) or inspect (inspect_evals tasks, run with uvx in a throwaway environment).
 
     uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1     # one attempt per task
     uv run scripts/run.py <bench> recipes/<id>.toml                  # the bench's n_attempts
@@ -12,12 +13,13 @@ Every run is a standalone contribution; scripts/summarize.py pools all runs of a
 more attempts later are simply another run (by anyone, on any host). --resume continues an interrupted
 run.
 
-    runs/<bench>/<run>/          in git: run.json (bench, recipe, host, versions, Harbor job),
-                                 recipe.toml, bench.toml, harbor-config-p1.json, trials.jsonl
+    runs/<bench>/<run>/          in git: run.json (bench, recipe, host, versions, job),
+                                 recipe.toml, bench.toml, <runner>-config-p1.json, trials.jsonl
     evidence/<bench>/<run>/      git-ignored: Harbor job output (trajectories, recordings, verifier logs)
-                                 and harbor.log; packed to <run>.tar.gz, sha256 in run.json
+                                 or inspect logs (JSON), and the runner's log; packed to <run>.tar.gz,
+                                 sha256 in run.json
 
-<run> = <date>_<recipe id>[_<n>]. run.json keeps a "parts" list holding the run's one Harbor job. When Harbor exits,
+<run> = <date>_<recipe id>[_<n>]. run.json keeps a "parts" list holding the run's one job. When the runner exits,
 scripts/collect.py --pack extracts trials.jsonl and archives the evidence. The API key is read from the
 recipe's api_key_env and passed only through the process environment.
 """
@@ -66,6 +68,46 @@ def harbor_config(bench, model, attempts, n_concurrent, job_name, jobs_dir):
     }
 
 
+def served_name(model):
+    """Recipe model "openai/<served name>" (LiteLLM style) -> the name the endpoint serves."""
+    return model["model"].split("/", 1)[1] if model["model"].startswith("openai/") else model["model"]
+
+
+def inspect_config(bench, model, attempts, n_concurrent, job_name, log_dir):
+    """The inspect command (minus the API key), as data so check.py can regenerate and compare it.
+    The endpoint is inspect's generic OpenAI-compatible provider named "arena": ARENA_BASE_URL and
+    ARENA_API_KEY come from the environment."""
+    harness, agent, suite = bench["harness"], bench["agent"], bench["suite"]
+    cmd = ["uvx", "--python", harness["python"], "--from", harness["requirements"][0]]
+    for req in harness["requirements"][1:]:
+        cmd += ["--with", req]
+    cmd += ["inspect", "eval", harness["task"]]
+    for key, value in harness.get("task_args", {}).items():
+        cmd += ["-T", f"{key}={json.dumps(value)}"]
+    cmd += [
+        "--sample-id", ",".join(suite["tasks"]),
+        "--epochs", str(attempts),
+        "--model", f"openai-api/arena/{served_name(model)}",
+        "--reasoning-effort", agent["reasoning_effort"],
+        "--temperature", str(agent["temperature"]),
+        "--max-tokens", str(agent["max_output_tokens"]),
+        "--timeout", str(agent["request_timeout_sec"]),
+        "--max-connections", str(n_concurrent),
+        "--max-samples", str(n_concurrent),
+        "--no-fail-on-error",
+        "--log-format", "json",
+        "--log-dir", str(log_dir),
+        "--display", "plain",
+    ]
+    return {"job_name": job_name, "log_dir": str(log_dir), "api_base": model["api_base"], "command": cmd}
+
+
+def harness_version(bench):
+    if bench["runner"] == "harbor":
+        return harbor_version()
+    return " + ".join(bench["harness"]["requirements"])
+
+
 def harbor_version():
     out = subprocess.run(["harbor", "--version"], capture_output=True, text=True)
     return out.stdout.strip() or out.stderr.strip()
@@ -96,7 +138,7 @@ def main():
     if not bench_file.exists():
         sys.exit(f"no {bench_file.relative_to(ROOT)}")
     bench = tomllib.loads(bench_file.read_text())
-    if bench["id"] != args.bench or bench["runner"] != "harbor":
+    if bench["id"] != args.bench or bench["runner"] not in ("harbor", "inspect"):
         sys.exit(f"{bench_file} is bench {bench['id']!r}, runner {bench['runner']!r}")
     model = tomllib.loads(args.model.read_text())
     attempts = args.attempts or bench["suite"]["n_attempts"]
@@ -122,7 +164,8 @@ def main():
             "recipe": {k: v for k, v in model.items() if k != "api_key_env"},
             "attempts": attempts,
             "finished": False,
-            "harbor": harbor_version(),
+            "runner": bench["runner"],
+            "harness": harness_version(bench),
             "host": host_info(),
             "started_at": now,
             "parts": [],
@@ -131,12 +174,15 @@ def main():
         part = meta["parts"][-1]
     else:
         part = {"job_name": run_dir.name, "attempts": attempts, "n_concurrent": n_concurrent,
-                "config": "harbor-config-p1.json", "started_at": now, "host": meta["host"]}
+                "config": f"{bench['runner']}-config-p1.json", "started_at": now, "host": meta["host"]}
     job_name = part["job_name"]
     # Absolute: Harbor resolves a relative jobs_dir against each task's compose directory when it copies
     # artifacts out of the container, which fails and can leave the verifier without the agent's files.
     ev_dir = ROOT / "evidence" / args.bench / job_name
-    cfg = harbor_config(bench, model, part["attempts"], part["n_concurrent"], job_name, ev_dir / "jobs")
+    if bench["runner"] == "harbor":
+        cfg = harbor_config(bench, model, part["attempts"], part["n_concurrent"], job_name, ev_dir / "jobs")
+    else:
+        cfg = inspect_config(bench, model, part["attempts"], part["n_concurrent"], job_name, ev_dir / "logs")
     if args.dry_run:
         print(json.dumps(cfg, indent=2))
         return
@@ -156,12 +202,24 @@ def main():
         sys.exit(f"{key_env} is not set")
     env["OPENAI_API_KEY"] = env[key_env] if key_env else "local"
 
-    cmd = ["harbor", "job", "resume", "-p", str(ev_dir / "jobs" / job_name)] if args.resume else \
-          ["harbor", "run", "-c", str(run_dir / part["config"]), "-y", "-q"]
+    if bench["runner"] == "harbor":
+        cmd = ["harbor", "job", "resume", "-p", str(ev_dir / "jobs" / job_name)] if args.resume else \
+              ["harbor", "run", "-c", str(run_dir / part["config"]), "-y", "-q"]
+    else:
+        env["ARENA_BASE_URL"], env["ARENA_API_KEY"] = model["api_base"], env["OPENAI_API_KEY"]
+        cmd = cfg["command"]
+        if args.resume:  # re-run the samples that did not finish, into a new log next to the old one
+            logs = sorted((ev_dir / "logs").glob("*.json"))
+            if not logs:
+                sys.exit(f"no inspect log in {ev_dir / 'logs'} to resume")
+            i = cmd.index("eval")
+            cmd = cmd[:i] + ["eval-retry", str(logs[-1]), "--max-connections", str(part["n_concurrent"]),
+                             "--max-samples", str(part["n_concurrent"]), "--no-fail-on-error",
+                             "--log-format", "json", "--log-dir", str(ev_dir / "logs"), "--display", "plain"]
     print(" ".join(cmd), flush=True)
-    with open(ev_dir / "harbor.log", "a") as log:
+    with open(ev_dir / f"{bench['runner']}.log", "a") as log:
         rc = subprocess.run(cmd, env=env, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT).returncode
-    print(f"harbor exited {rc}", flush=True)
+    print(f"{bench['runner']} exited {rc}", flush=True)
     collect = [sys.executable, str(ROOT / "scripts/collect.py"), str(run_dir)] + (["--pack"] if rc == 0 else [])
     subprocess.run(collect, cwd=ROOT)
     print("next: uv run scripts/summarize.py", flush=True)

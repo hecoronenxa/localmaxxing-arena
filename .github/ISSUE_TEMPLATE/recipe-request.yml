@@ -42,7 +42,7 @@ body:
     attributes:
       label: Benchmark
       options:
-        - any
+        - bfcl-100
     validations:
       required: true
   - type: input

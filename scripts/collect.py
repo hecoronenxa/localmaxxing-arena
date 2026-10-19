@@ -2,18 +2,20 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Extract the raw metrics of a run from its Harbor output (evidence) into the repo.
+"""Extract the raw metrics of a run from its runner output (evidence: Harbor jobs or inspect logs) into the repo.
 
     uv run scripts/collect.py runs/<bench>/<run dir>           # refresh trials.jsonl (works mid-run)
     uv run scripts/collect.py runs/<bench>/<run dir> --pack    # also archive finished parts' evidence
 
 Reads evidence/<bench>/<job>/ for every part of the run (git-ignored: trajectories, terminal recordings,
-verifier logs) and writes runs/<bench>/<run>/trials.jsonl, one line of core stats per finished trial.
+verifier logs, inspect logs) and writes runs/<bench>/<run>/trials.jsonl, one line of core stats per finished
+trial. For inspect benches a trial is one sample epoch, and its task_ref is the content digest defined by the
+bench's select.py.
 With --pack, writes evidence/<bench>/<run>.tar.gz once the run is finished and records its name, size and
 sha256 in run.json; an archive over 24 MB is also split into <run>.part01.gz, .part02.gz, ... for upload
 (GitHub's attachment limit is 25 MB; `cat <run>.part*.gz > <run>.tar.gz` restores it). Attach the archive or its pieces to the PR.
 """
-import argparse, hashlib, json, statistics, subprocess, sys, tomllib
+import argparse, hashlib, importlib.util, json, statistics, subprocess, sys, tomllib
 from datetime import datetime
 from pathlib import Path
 
@@ -102,6 +104,74 @@ def trial_row(trial_dir, reply_cap):
     return row
 
 
+def bench_digest(bench):
+    """The bench's task-content digest function (benches/<bench>/select.py), if it defines one."""
+    f = ROOT / "benches" / bench / "select.py"
+    if not f.exists():
+        return None
+    spec = importlib.util.spec_from_file_location(f"select_{bench}", f)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return getattr(mod, "digest", None)
+
+
+def reward_of(sample):
+    """First scorer's value: C/I (inspect convention) or a number."""
+    scores = list((sample.get("scores") or {}).values())
+    if not scores:
+        return 0.0
+    v = scores[0].get("value")
+    if isinstance(v, str):
+        return 1.0 if v == "C" else 0.0
+    return float(v or 0.0)
+
+
+def inspect_rows(ev, reply_cap, digest):
+    """One row per finished sample epoch over every log in ev/logs (a resumed run has several; the
+    newest log wins for a sample it re-ran). Returns (rows, finished)."""
+    logs = sorted((ev / "logs").glob("*.json"))
+    samples, finished = {}, False
+    for f in logs:
+        log = json.loads(f.read_text())
+        for smp in log.get("samples") or []:
+            samples[(smp["id"], smp.get("epoch", 1))] = smp
+        finished = log.get("status") == "success"  # the newest log decides; cancelled/error -> run.py --resume
+    rows = []
+    for (sid, epoch), smp in sorted(samples.items(), key=lambda kv: (str(kv[0][0]), kv[0][1])):
+        usage = list((smp.get("model_usage") or {}).values())
+        u = lambda k: sum((x.get(k) or 0) for x in usage) if usage else None  # noqa: E731
+        assistant = [m for m in smp.get("messages") or [] if m.get("role") == "assistant"]
+        model_events = [e for e in smp.get("events") or [] if e.get("event") == "model"]
+        outputs = [(e.get("output") or {}) for e in model_events]
+        out_usage = [o.get("usage") or {} for o in outputs]
+        err = smp.get("error")
+        row = {
+            "trial": f"{sid}#e{epoch}",
+            "task": sid,
+            "task_ref": digest(smp.get("input"), smp.get("target"), smp.get("metadata")) if digest else None,
+            "reward": reward_of(smp) if not err else 0.0,
+            "exception": (err.get("message") or "error").splitlines()[0][:120] if err else None,
+            # inspect counts cache reads separately; input_tokens here includes them, as Harbor's does
+            "input_tokens": (u("input_tokens") or 0) + (u("input_tokens_cache_read") or 0) if usage else None,
+            "cached_tokens": u("input_tokens_cache_read"),
+            "output_tokens": u("output_tokens"),
+            "reasoning_tokens": u("reasoning_tokens"),
+            "llm_calls": len(model_events) or len(assistant),
+            "tool_calls": sum(len(m.get("tool_calls") or []) for m in assistant),
+            "max_prompt_tokens": max((x.get("input_tokens") or 0) + (x.get("input_tokens_cache_read") or 0)
+                                     for x in out_usage) if out_usage else None,
+            "max_output_tokens": max((x.get("output_tokens") or 0) for x in out_usage) if out_usage else None,
+            "replies_over_cap": sum(1 for o in outputs if (o.get("choices") or [{}])[0].get("stop_reason") == "max_tokens"),
+            "agent_s": round(smp["total_time"], 1) if smp.get("total_time") is not None else None,
+            "working_s": round(smp["working_time"], 1) if smp.get("working_time") is not None else None,
+            "started_at": smp.get("started_at"),
+        }
+        if row["reasoning_tokens"] is not None and row["output_tokens"]:
+            row["reasoning_share"] = round(row["reasoning_tokens"] / row["output_tokens"], 3)
+        rows.append(row)
+    return rows, finished
+
+
 def sha256(path):
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -137,7 +207,10 @@ def main():
     args = ap.parse_args()
     run_dir = args.run_dir.resolve()
     meta = json.loads((run_dir / "run.json").read_text())
-    reply_cap = tomllib.loads((run_dir / "bench.toml").read_text())["agent"]["max_output_tokens"]
+    spec = tomllib.loads((run_dir / "bench.toml").read_text())
+    reply_cap = spec["agent"]["max_output_tokens"]
+    runner = spec.get("runner", "harbor")
+    digest = bench_digest(meta["bench"]) if runner == "inspect" else None
     old = [json.loads(line) for line in (run_dir / "trials.jsonl").read_text().splitlines() if line.strip()] \
         if (run_dir / "trials.jsonl").exists() else []
     rows = []
@@ -149,12 +222,15 @@ def main():
             rows += kept
             print(f"{part['job_name']}: no local evidence, kept {len(kept)} committed trials")
             continue
-        part_rows = [row for f in sorted(ev.glob("jobs/*/*/result.json")) if (row := trial_row(f.parent, reply_cap))]
+        if runner == "inspect":
+            part_rows, part["finished"] = inspect_rows(ev, reply_cap, digest)
+        else:
+            part_rows = [row for f in sorted(ev.glob("jobs/*/*/result.json")) if (row := trial_row(f.parent, reply_cap))]
+            job = next(ev.glob("jobs/*/result.json"), None)
+            part["finished"] = bool(job and json.loads(job.read_text()).get("finished_at"))
         for row in part_rows:
             row["part"] = part["job_name"]
         rows += part_rows
-        job = next(ev.glob("jobs/*/result.json"), None)
-        part["finished"] = bool(job and json.loads(job.read_text()).get("finished_at"))
         if args.pack and part["finished"] and not part.get("evidence"):
             archive = ev.parent / f"{ev.name}.tar.gz"
             subprocess.run(["tar", "-czf", str(archive), "-C", str(ev.parent), ev.name], check=True)

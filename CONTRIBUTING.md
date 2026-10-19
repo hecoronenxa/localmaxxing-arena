@@ -49,10 +49,13 @@ load balancer in between cuts long requests.
 
 ## 2. Run it
 
-Needs Docker (Colima, OrbStack or Docker Desktop) and [uv](https://docs.astral.sh/uv/); each bench
-README lists its own tools. Keep the clone in a
-directory Docker can mount (Colima shares only your home directory by default, not `/tmp`): Harbor
-copies the agent's files from the task container into `evidence/` and on to the verifier.
+Needs [uv](https://docs.astral.sh/uv/); each bench README lists its own tools. A bench runs through one of
+two runners (`runner` in its `bench.toml`): **inspect** benches (e.g. BFCL-100) need nothing else, `run.py`
+runs [inspect](https://inspect.aisi.org.uk/) with `uvx` in a throwaway environment pinned by the bench;
+**Harbor** benches run each task in a container and need Docker (Colima, OrbStack or Docker Desktop) and
+Harbor. For Harbor, keep the clone in a directory Docker can mount (Colima shares only your home directory
+by default, not `/tmp`): Harbor copies the agent's files from the task container into `evidence/` and on to
+the verifier.
 
 ```bash
 uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1   # one result: the cheapest useful run
@@ -62,7 +65,7 @@ uv run scripts/collect.py runs/<bench>/<run>                   # refresh raw met
 ```
 
 `--n-concurrent N` lowers parallelism when the runner host has less room than the endpoint. Don't change
-anything else: no edits to `benches/`, no other flags. When Harbor finishes, `run.py` extracts the raw
+anything else: no edits to `benches/`, no other flags. When the runner finishes, `run.py` extracts the raw
 metrics and packs the evidence automatically.
 
 ## 2b. Measure speed (optional, recommended)
@@ -89,13 +92,13 @@ The repo keeps **raw metrics** only. `runs/<bench>/<run>/` holds:
 
 | File | |
 |---|---|
-| `run.json` | what ran: bench, recipe, attempts, Harbor version, runner host, evidence size and sha256 |
+| `run.json` | what ran: bench, recipe, attempts, runner and harness version, runner host, evidence size and sha256 |
 | `recipe.toml`, `bench.toml` | copies as of the run |
-| `harbor-config-p1.json` | the generated Harbor config (no secrets) |
-| `trials.jsonl` | one line per trial: reward, exception, tokens (input / cached / output / estimated reasoning), cost, LLM calls, tool calls, largest prompt and reply, parse errors, replies cut at `max_tokens`, context summarizations, time split into setup / agent / LLM / verifier |
+| `<runner>-config-p1.json` | the generated Harbor config or inspect command (no secrets) |
+| `trials.jsonl` | one line per trial (an inspect sample epoch, or a Harbor trial): reward, exception, task content digest, tokens, LLM and tool calls, largest prompt and reply, replies cut at `max_tokens`, time; Harbor trials add cost, parse errors, context summarizations and a setup / agent / LLM / verifier split |
 
-**Evidence**, Harbor's full output (agent trajectories with reasoning, terminal recordings, verifier
-logs), never goes into git. It sits in `evidence/<bench>/<run>/` (git-ignored) and is packed to
+**Evidence**, the runner's full output (inspect logs with every message and model call, or Harbor's agent
+trajectories, terminal recordings and verifier logs), never goes into git. It sits in `evidence/<bench>/<run>/` (git-ignored) and is packed to
 `evidence/<bench>/<run>.tar.gz`, with its size and sha256 recorded in `run.json`. An archive over 24 MB
 is also split into `<run>.part01.gz`, `<run>.part02.gz`, … so it fits GitHub's 25 MB attachment limit
 (`cat <run>.part*.gz > <run>.tar.gz` restores it). Evidence travels with the pull request (below).
@@ -122,7 +125,7 @@ PR description or a comment: the `.tar.gz`, or all of its `.partNN.gz` pieces. A
 compares the attachment's sha256 with `run.json`.
 
 CI (`check.py`) verifies each run: its `bench.toml` is identical to the current one, the recipe's
-`id` / `model` / `api_base` still match, the Harbor config is exactly what `run.py` generates, Harbor is
+`id` / `model` / `api_base` still match, the runner config is exactly what `run.py` generates, the harness is
 the benchmark's version, every trial used the pinned task content, every task has `attempts` trials,
 and the run is finished with its evidence recorded. A maintainer reviews the evidence (spot-checking
 trajectories) and merges. After the merge, `.github/workflows/publish.yml` re-validates `main`, rebuilds
@@ -172,15 +175,16 @@ interval.
 
 ```
 benches/<bench>/README.md            what the bench tests, tasks, how to run
+benches/<bench>/select.py            inspect benches: reproduces the task list and the task content digest
 benches/<bench>/bench.toml           frozen definition (suite + task digests, agent, context, result target)
 benches/<bench>/RESULTS.md           generated: per-task results and agent behaviour, all recipes
 benches/<bench>/recipes/<id>.md      generated: one recipe's runs, pooled per-task results and behaviour
 leaderboard.toml                     benches shown as README leaderboard columns
 recipes/<model>@<recipe>.toml        one endpoint per file
-runs/<bench>/<date>_<recipe>[_<n>]/  one run: run.json, recipe.toml, bench.toml, harbor-config-p1.json, trials.jsonl
+runs/<bench>/<date>_<recipe>[_<n>]/  one run: run.json, recipe.toml, bench.toml, <runner>-config-p1.json, trials.jsonl
 speed/<recipe id>/<date>[_<n>].json  one speed measurement (pp / tg at 32K context)
 evidence/<bench>/<run>/ + .tar.gz    git-ignored; attached to the PR
-scripts/run.py                       bench + recipe -> Harbor job -> runs/ + evidence/
+scripts/run.py                       bench + recipe -> inspect or Harbor job -> runs/ + evidence/
 scripts/collect.py                   evidence/ -> trials.jsonl; --pack archives (and splits) the evidence
 scripts/summarize.py                 runs/ -> README leaderboard, RESULTS.md, recipe pages (CI, after merge)
 scripts/rating.py                    the rating fit (Rasch / Bradley-Terry, no dependencies)

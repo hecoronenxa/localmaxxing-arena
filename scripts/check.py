@@ -7,9 +7,9 @@
     uv run scripts/check.py
 
 A run passes when its bench.toml copy is identical to benches/<bench>/bench.toml (benchmarks are
-frozen), its recipe still exists with the same id, model and api_base, each part's harbor-config-p<N>.json is
-exactly what scripts/run.py generates from them, it ran on the bench's Harbor version, every trial used the
-pinned task content, trials.jsonl covers every task `attempts` times, every part is finished with its evidence archive recorded,
+frozen), its recipe still exists with the same id, model and api_base, each part's <runner>-config-p<N>.json
+is exactly what scripts/run.py generates from them, it ran on the bench's harness (Harbor version, or the
+inspect requirements), every trial used the pinned task content, trials.jsonl covers every task `attempts` times, every part is finished with its evidence archive recorded,
 and the leaderboard renders. Every leaderboard column after the first also needs full runs from at
 least two anchor recipes. Speed records (speed/<recipe id>/*.json) are validated too. Generated files are not checked: the publish workflow rebuilds them on main.
 """
@@ -47,24 +47,30 @@ def check_run(run_dir, run_py):
         if ran.get(key) != recipe.get(key):
             errs.append(f"recipe {key} changed since the run ({ran.get(key)!r} -> {recipe.get(key)!r}); use a new recipe id")
 
+    runner = spec.get("runner", "harbor")
     for part in meta["parts"]:
         config = run_dir / part["config"]
         cfg = json.loads(config.read_text()) if config.exists() else {}
-        jobs_dir = Path(cfg.get("jobs_dir", ""))  # absolute path on the runner host
-        if jobs_dir.parts[-4:] != ("evidence", bench, part["job_name"], "jobs"):
-            errs.append(f"{part['config']}: jobs_dir {cfg.get('jobs_dir')!r} is not .../evidence/{bench}/{part['job_name']}/jobs")
-        expected = run_py.harbor_config(spec, ran, part["attempts"], part["n_concurrent"], part["job_name"], jobs_dir)
+        sub = "jobs" if runner == "harbor" else "logs"
+        out_dir = Path(cfg.get("jobs_dir" if runner == "harbor" else "log_dir", ""))  # absolute path on the runner host
+        if out_dir.parts[-4:] != ("evidence", bench, part["job_name"], sub):
+            errs.append(f"{part['config']}: output dir {str(out_dir)!r} is not .../evidence/{bench}/{part['job_name']}/{sub}")
+        make = run_py.harbor_config if runner == "harbor" else run_py.inspect_config
+        expected = make(spec, ran, part["attempts"], part["n_concurrent"], part["job_name"], out_dir)
         if cfg != expected:
             errs.append(f"{part['config']} is not what scripts/run.py generates from bench.toml and recipe.toml")
         ev = part.get("evidence") or {}
         if not (ev.get("archive") and ev.get("sha256") and ev.get("bytes")):
             errs.append(f"{part['job_name']}: evidence not packed (scripts/collect.py --pack)")
         if not part.get("finished"):
-            errs.append(f"{part['job_name']}: Harbor job not finished")
+            errs.append(f"{part['job_name']}: {runner} job not finished")
     if meta["attempts"] != sum(p["attempts"] for p in meta["parts"]):
         errs.append("attempts is not the sum of the parts' attempts")
-    if spec["harbor_version"] not in meta.get("harbor", ""):
-        errs.append(f"ran on {meta.get('harbor')!r}, bench requires Harbor {spec['harbor_version']}")
+    harness = meta.get("harness", meta.get("harbor", ""))
+    if runner == "harbor" and spec["harbor_version"] not in harness:
+        errs.append(f"ran on {harness!r}, bench requires Harbor {spec['harbor_version']}")
+    if runner == "inspect" and harness != run_py.harness_version(spec):
+        errs.append(f"ran on {harness!r}, bench requires {run_py.harness_version(spec)!r}")
 
     rows = [json.loads(l) for l in (run_dir / "trials.jsonl").read_text().splitlines() if l.strip()] \
         if (run_dir / "trials.jsonl").exists() else []
