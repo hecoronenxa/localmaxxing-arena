@@ -2,16 +2,16 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Rebuild RESULTS.md from every runs/<bench>/*/run.json and the Harbor trial results under it.
+"""Rebuild RESULTS.md and each run's STATS.md from runs/<bench>/*/run.json and trials.jsonl.
 
-    uv run scripts/summarize.py
+    uv run scripts/summarize.py            # write
+    uv run scripts/summarize.py --check    # exit 1 if any generated file is stale (CI)
 
 One leaderboard per bench and protocol, local recipes ranked by score, with the API references
 marked. Score = mean reward over all trials of a run (TB convention: a trial that errors or times
 out scores 0). The 95% interval is Wilson over trials, treating reward >= 1 as a pass.
 """
-import json, math, statistics, tomllib
-from datetime import datetime
+import argparse, json, math, statistics, sys, tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,102 +26,152 @@ def wilson(p, n, z=1.96):
     return (max(0.0, c - h), min(1.0, c + h))
 
 
-def ts(s):
-    return datetime.fromisoformat(s.replace("Z", "+00:00")) if s else None
-
-
 def load_trials(run_dir):
-    trials = []
-    for f in sorted((run_dir / "jobs").glob("*/*/result.json")):
-        r = json.loads(f.read_text())
-        if "task_name" not in r:
-            continue
-        rewards = (r.get("verifier_result") or {}).get("rewards") or {}
-        ar = r.get("agent_result") or {}
-        ae = r.get("agent_execution") or {}
-        start, end = ts(ae.get("started_at")), ts(ae.get("finished_at"))
-        trials.append({
-            "task": r["task_name"].split("/")[-1],
-            "done": r.get("finished_at") is not None,
-            "reward": float(rewards.get("reward", 0.0) or 0.0),
-            "exception": (r.get("exception_info") or {}).get("exception_type"),
-            "in": ar.get("n_input_tokens") or 0,
-            "cache": ar.get("n_cache_tokens") or 0,
-            "out": ar.get("n_output_tokens") or 0,
-            "cost": ar.get("cost_usd") or 0.0,
-            "agent_min": (end - start).total_seconds() / 60 if start and end else None,
-        })
-    return trials
+    f = run_dir / "trials.jsonl"
+    return [json.loads(line) for line in f.read_text().splitlines() if line.strip()] if f.exists() else []
+
+
+def mean(rows, key):
+    vals = [r[key] for r in rows if r.get(key) is not None]
+    return statistics.fmean(vals) if vals else None
+
+
+def total(rows, key):
+    return sum(r.get(key) or 0 for r in rows)
+
+
+def fmt(v, spec="{:,.0f}"):
+    return "-" if v is None else spec.format(v)
 
 
 def score_run(meta, trials, n_tasks):
-    done = [t for t in trials if t["done"]]
-    passes = sum(t["reward"] >= 1 for t in done)
-    times = [t["agent_min"] for t in done if t["agent_min"] is not None]
+    passes = sum(t["reward"] >= 1 for t in trials)
+    times = [t["agent_s"] / 60 for t in trials if t.get("agent_s") is not None]
     return {
-        "done": done,
+        "trials": trials,
         "expected": meta["attempts"] * n_tasks,
-        "score": statistics.fmean(t["reward"] for t in done) if done else 0.0,
-        "ci": wilson(passes / len(done), len(done)) if done else (0.0, 0.0),
-        "errors": sum(1 for t in done if t["exception"]),
-        "tokens": [sum(t[k] for t in done) / 1e6 for k in ("in", "cache", "out")],
-        "cost": sum(t["cost"] for t in done),
+        "score": statistics.fmean(t["reward"] for t in trials) if trials else 0.0,
+        "ci": wilson(passes / len(trials), len(trials)) if trials else (0.0, 0.0),
+        "errors": sum(1 for t in trials if t.get("exception")),
+        "cost": total(trials, "cost_usd"),
         "median_min": statistics.median(times) if times else None,
     }
 
 
-def bench_section(bench_dir):
+# Behaviour columns: (header, value over a list of trials). Averages are per trial.
+BEHAVIOUR = [
+    ("LLM calls", lambda t: fmt(mean(t, "llm_calls"), "{:.1f}")),
+    ("Tool calls", lambda t: fmt(mean(t, "tool_calls"), "{:.1f}")),
+    ("Output tok", lambda t: fmt(mean(t, "output_tokens"))),
+    ("Reasoning tok (est)", lambda t: fmt(mean(t, "reasoning_tokens_est"))),
+    ("Reasoning share", lambda t: fmt(mean(t, "reasoning_share"), "{:.0%}")),
+    ("Input tok", lambda t: fmt(mean(t, "input_tokens"))),
+    ("Cache hit", lambda t: fmt(total(t, "cached_tokens") / total(t, "input_tokens")
+                                if total(t, "input_tokens") else None, "{:.0%}")),
+    ("Max prompt", lambda t: fmt(max((r.get("max_prompt_tokens") or 0 for r in t), default=None))),
+    ("Max reply", lambda t: fmt(max((r.get("max_output_tokens") or 0 for r in t), default=None))),
+    ("Out tok/s", lambda t: fmt(total(t, "output_tokens") / total(t, "llm_s") if total(t, "llm_s") else None, "{:.1f}")),
+    ("LLM share of agent time", lambda t: fmt(total(t, "llm_s") / total(t, "agent_s") if total(t, "agent_s") else None, "{:.0%}")),
+    ("Agent min", lambda t: fmt(mean(t, "agent_s") and mean(t, "agent_s") / 60, "{:.1f}")),
+    ("Parse err", lambda t: str(total(t, "parse_errors"))),
+    ("At reply cap", lambda t: str(total(t, "calls_at_reply_cap"))),
+    ("Summarized", lambda t: str(total(t, "summarizations"))),
+    ("No task_complete", lambda t: str(sum(1 for r in t if not r.get("task_complete_calls")))),
+]
+BEHAVIOUR_NOTE = (
+    "Per-trial averages unless noted. *Reasoning tok (est)* splits output tokens by the character share of "
+    "reasoning vs visible output (Harbor does not keep the provider's reasoning-token count). *Max prompt / "
+    "Max reply* = largest single LLM call. *Out tok/s* = output tokens / time inside LLM calls (includes "
+    "prefill and queueing). *Parse err*, *At reply cap* (call hit `max_tokens`), *Summarized* (context "
+    "summarizations) and *No task_complete* (trial ended without the agent declaring completion) are totals.")
+
+
+def behaviour_table(first_header, label_rows):
+    out = ["| " + " | ".join([first_header] + [h for h, _ in BEHAVIOUR]) + " |",
+           "|---|" + "---|" * len(BEHAVIOUR)]
+    for label, trials in label_rows:
+        out.append("| " + " | ".join([label] + [f(trials) if trials else "·" for _, f in BEHAVIOUR]) + " |")
+    return out
+
+
+def run_stats(bench, meta, s, tasks):
+    r = meta["recipe"]
+    lines = [f"# {r['display_name']} · {bench} · protocol {meta['protocol']}", "",
+             "Generated by `scripts/summarize.py`; do not edit by hand.", "",
+             f"- Recipe: `{meta['recipe_file']}` ({r.get('role', 'local')})",
+             f"- Weights: {r.get('weights', '-')}", f"- Serving: {r.get('serving', '-')}", f"- Hardware: {r.get('hardware', '-')}",
+             f"- Attempts: {meta['attempts']}{' (smoke)' if meta.get('smoke') else ''}, concurrency {meta['n_concurrent']}, "
+             f"{meta['harbor']}, runner {meta['host'].get('machine')} / {meta['host'].get('os')}",
+             f"- Score: **{s['score']:.1%}** over {len(s['trials'])}/{s['expected']} trials, {s['errors']} errored",
+             f"- Evidence: {(meta.get('evidence') or {}).get('archive', 'not packed')} "
+             f"sha256 `{(meta.get('evidence') or {}).get('sha256', '-')}`", "",
+             "## Per task", "",
+             "| Task | Passes | Mean reward | Exceptions |", "|---|---|---|---|"]
+    for task in tasks:
+        tt = [t for t in s["trials"] if t["task"] == task]
+        exc = sorted({t["exception"] for t in tt if t.get("exception")})
+        lines.append(f"| `{task}` | {sum(t['reward'] >= 1 for t in tt)}/{len(tt)} | "
+                     f"{fmt(mean(tt, 'reward'), '{:.2f}')} | {', '.join(exc) or '-'} |")
+    lines += ["", "## Behaviour per task", "", BEHAVIOUR_NOTE, ""]
+    lines += behaviour_table("Task", [(f"`{t}`", [x for x in s["trials"] if x["task"] == t]) for t in tasks]
+                             + [("**all**", s["trials"])])
+    return "\n".join(lines) + "\n"
+
+
+def bench_section(bench_dir, files):
     protocols = {}
     for f in bench_dir.glob("protocol-v*.toml"):
         p = tomllib.loads(f.read_text())
         protocols[p["name"]] = p
-    runs = []
-    for d in sorted((ROOT / "runs" / bench_dir.name).glob("*/run.json")):
-        meta = json.loads(d.read_text())
-        runs.append((meta, load_trials(d.parent)))
+    runs = [(json.loads(d.read_text()), d.parent) for d in sorted((ROOT / "runs" / bench_dir.name).glob("*/run.json"))]
     out = []
     for name in sorted({m["protocol"] for m, _ in runs}):
         tasks = protocols[name]["suite"]["tasks"]
-        rows = [(m, score_run(m, t, len(tasks))) for m, t in runs if m["protocol"] == name]
+        rows = [(m, score_run(m, load_trials(d), len(tasks)), d) for m, d in runs if m["protocol"] == name]
         rows.sort(key=lambda r: (r[0]["recipe"].get("role") == "reference", -r[1]["score"]))
-        refs = {m["recipe"]["model_family"]: s["score"] for m, s in rows
+        refs = {m["recipe"]["model_family"]: s["score"] for m, s, _ in rows
                 if m["recipe"].get("role") == "reference" and not m.get("smoke")}
         out += [f"## {bench_dir.name} · protocol {name}", "",
                 f"Settings: [benches/{bench_dir.name}/protocol-{name}.toml](benches/{bench_dir.name}/protocol-{name}.toml)", "",
-                "| # | Recipe | Role | k | Score (95% CI) | vs API | Trials done · errored | Tokens in / cached / out (M) | Cost | Median agent time |",
-                "|---|---|---|---|---|---|---|---|---|---|"]
+                "| # | Recipe | Role | k | Score (95% CI) | vs API | Trials done · errored | Cost | Median agent time |",
+                "|---|---|---|---|---|---|---|---|---|"]
         rank = 0
-        for m, s in rows:
+        for m, s, d in rows:
             r = m["recipe"]
             local = r.get("role") != "reference"
             rank += local
-            flags = (" *(smoke)*" if m.get("smoke") else "") + \
-                    (f" *(running {len(s['done'])}/{s['expected']})*" if len(s["done"]) < s["expected"] else "")
+            n = len(s["trials"])
+            flags = (" *(smoke)*" if m.get("smoke") else "") + (f" *(running {n}/{s['expected']})*" if n < s["expected"] else "")
             ref = refs.get(r["model_family"])
             delta = f"{(s['score'] - ref) * 100:+.1f} pt" if local and ref is not None else "-"
             lo, hi = s["ci"]
+            stats = f"runs/{bench_dir.name}/{d.name}/STATS.md"
             out.append(
-                f"| {rank if local else ''} | [{r['display_name']}](runs/{bench_dir.name}/{m['job_name']}/run.json){flags} | "
+                f"| {rank if local else ''} | [{r['display_name']}]({stats}){flags} | "
                 f"{'API reference' if not local else 'local'} | {m['attempts']} | **{s['score']:.1%}** ({lo:.0%}–{hi:.0%}) | "
-                f"{delta} | {len(s['done'])}/{s['expected']} · {s['errors']} | "
-                f"{s['tokens'][0]:.2f} / {s['tokens'][1]:.2f} / {s['tokens'][2]:.2f} | "
-                f"{'$%.2f' % s['cost'] if s['cost'] else '-'} | "
+                f"{delta} | {n}/{s['expected']} · {s['errors']} | {'$%.2f' % s['cost'] if s['cost'] else '-'} | "
                 f"{'%.0f min' % s['median_min'] if s['median_min'] is not None else '-'} |")
+            files[ROOT / stats] = run_stats(bench_dir.name, m, s, tasks)
         out += ["", "Per task (passes / trials):", "",
                 "| Recipe | " + " | ".join(f"`{t}`" for t in tasks) + " |",
                 "|---|" + "---|" * len(tasks)]
-        for m, s in rows:
+        for m, s, _ in rows:
             cells = []
             for task in tasks:
-                tt = [t for t in s["done"] if t["task"] == task]
-                e = sum(1 for t in tt if t["exception"])
+                tt = [t for t in s["trials"] if t["task"] == task]
+                e = sum(1 for t in tt if t.get("exception"))
                 cells.append(f"{sum(t['reward'] >= 1 for t in tt)}/{len(tt)}" + (f" ({e} err)" if e else "") if tt else "·")
             out.append(f"| {m['recipe']['display_name']}{' *(smoke)*' if m.get('smoke') else ''} | " + " | ".join(cells) + " |")
+        out += ["", "Behaviour (per-task breakdown in each run's STATS.md):", "", BEHAVIOUR_NOTE, ""]
+        out += behaviour_table("Recipe", [(m["recipe"]["display_name"] + (" *(smoke)*" if m.get("smoke") else ""), s["trials"])
+                                for m, s, _ in rows])
         out.append("")
     return out
 
 
-def main():
+def render():
+    """Every generated file: {path: content}."""
+    files = {}
     lines = ["# Results", "",
              "Generated by `scripts/summarize.py`; do not edit by hand. Local recipes are ranked by score; "
              "official APIs are reference lines, and *vs API* is the gap to the same model's API reference "
@@ -130,9 +180,24 @@ def main():
              "`err` = trial raised an exception (timeout, context overflow, infrastructure).", ""]
     for bench_dir in sorted((ROOT / "benches").iterdir()):
         if bench_dir.is_dir():
-            lines += bench_section(bench_dir)
-    (ROOT / "RESULTS.md").write_text("\n".join(lines))
-    print("\n".join(lines))
+            lines += bench_section(bench_dir, files)
+    files[ROOT / "RESULTS.md"] = "\n".join(lines)
+    return files
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true", help="fail if generated files are stale")
+    args = ap.parse_args()
+    files = render()
+    stale = [p for p, text in files.items() if not p.exists() or p.read_text() != text]
+    if args.check:
+        for p in stale:
+            print(f"stale: {p.relative_to(ROOT)} (run scripts/summarize.py)")
+        sys.exit(1 if stale else 0)
+    for p in stale:
+        p.write_text(files[p])
+    print(files[ROOT / "RESULTS.md"])
 
 
 if __name__ == "__main__":

@@ -8,10 +8,16 @@
     uv run scripts/run.py terminal-bench-4 recipes/<id>.toml --attempts 1    # smoke run
     uv run scripts/run.py terminal-bench-4 recipes/<id>.toml --resume runs/terminal-bench-4/<dir>
 
-The protocol is the newest benches/<bench>/protocol-v*.toml unless --protocol is given. Writes
-runs/<bench>/<date>_<protocol>_<recipe id>[_k<attempts>]/ containing run.json (what ran: protocol,
-recipe, host, versions), harbor-config.json, harbor.log and the Harbor job directory. The API key is
-read from the recipe's api_key_env and passed only through the process environment.
+The protocol is the newest benches/<bench>/protocol-v*.toml unless --protocol is given. Two places:
+
+    runs/<bench>/<run>/       in git: run.json (what ran: protocol, recipe, host, versions),
+                              recipe.toml, protocol.toml, harbor-config.json, trials.jsonl (raw metrics)
+    evidence/<bench>/<run>/   git-ignored: Harbor job output (trajectories, recordings, verifier logs)
+                              and harbor.log; packed to <run>.tar.gz with its sha256 in run.json
+
+<run> = <date>_<protocol>_<recipe id>[_k<attempts>]. When Harbor exits, scripts/collect.py --pack
+extracts trials.jsonl and archives the evidence. The API key is read from the recipe's api_key_env and
+passed only through the process environment.
 """
 import argparse, datetime, json, os, platform, shutil, subprocess, sys, tomllib
 from pathlib import Path
@@ -100,6 +106,9 @@ def main():
 
     if args.resume:
         run_dir = args.resume.resolve()
+        bench_ = json.loads((run_dir / "run.json").read_text())["bench"]
+        if bench_ != args.bench:
+            sys.exit(f"{run_dir} is a {bench_} run")
         meta = json.loads((run_dir / "run.json").read_text())
         job_name = meta["job_name"]
     else:
@@ -110,12 +119,14 @@ def main():
         if run_dir.exists():
             sys.exit(f"{run_dir} exists; pass --resume {run_dir} to continue it")
 
-    cfg = harbor_config(protocol, model, attempts, n_concurrent, job_name, run_dir / "jobs")
+    ev_dir = Path("evidence") / args.bench / job_name  # relative to ROOT, the cwd Harbor runs in
+    cfg = harbor_config(protocol, model, attempts, n_concurrent, job_name, ev_dir / "jobs")
     if args.dry_run:
         print(json.dumps(cfg, indent=2))
         return
 
     run_dir.mkdir(parents=True, exist_ok=True)
+    (ROOT / ev_dir).mkdir(parents=True, exist_ok=True)
     (run_dir / "harbor-config.json").write_text(json.dumps(cfg, indent=2) + "\n")
     if not args.resume:
         meta = {
@@ -142,12 +153,15 @@ def main():
         sys.exit(f"{key_env} is not set")
     env["OPENAI_API_KEY"] = env[key_env] if key_env else "local"
 
-    cmd = ["harbor", "job", "resume", "-p", str(run_dir / "jobs" / job_name)] if args.resume else \
+    cmd = ["harbor", "job", "resume", "-p", str(ev_dir / "jobs" / job_name)] if args.resume else \
           ["harbor", "run", "-c", str(run_dir / "harbor-config.json"), "-y", "-q"]
     print(" ".join(cmd), flush=True)
-    with open(run_dir / "harbor.log", "a") as log:
+    with open(ROOT / ev_dir / "harbor.log", "a") as log:
         rc = subprocess.run(cmd, env=env, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT).returncode
-    print(f"harbor exited {rc}; summarize with: uv run scripts/summarize.py", flush=True)
+    print(f"harbor exited {rc}", flush=True)
+    collect = [sys.executable, str(ROOT / "scripts/collect.py"), str(run_dir)] + (["--pack"] if rc == 0 else [])
+    subprocess.run(collect, cwd=ROOT)
+    print("next: uv run scripts/summarize.py", flush=True)
     sys.exit(rc)
 
 

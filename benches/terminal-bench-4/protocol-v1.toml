@@ -21,7 +21,7 @@ tasks = [
   "freecad-platform-drawing",
   "bun-sourcemap-leak",
 ]
-n_attempts = 5                     # TB 4.0 official; `run.py --attempts 1` makes a smoke run, flagged in RESULTS.md
+n_attempts = 3                     # TB 4.0 official is 5; 3 cuts wall time by 40%. `--attempts 1` = smoke run, flagged in RESULTS.md
 
 [agent]
 name = "terminus-2"
