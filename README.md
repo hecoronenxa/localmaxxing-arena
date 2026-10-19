@@ -21,8 +21,9 @@ comparable across them. The table is rebuilt automatically after every merge.
 <!-- leaderboard:start -->
 | Recipe | Weights | Reasoning | Hardware | PP 32K (tok/s) | TG 32K (tok/s) | [BFCL-100](benches/bfcl-100/RESULTS.md) | Rating (95% CI) | Coverage |
 |---|---|---|---|---|---|---|---|---|
-| [DeepSeek-V4.1-Flash · TensorFold TP2](recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.toml) *(anchor)* | EXL3 2.9bpw | low | 2× DGX Spark | 1,056 | 58.4 | [68.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.md) | **1160** (1054–1266) | 100/100 |
-| [GLM-5.3-Flash · Mia EXL3 · TensorFold TP2](recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml) | EXL3 4bpw | low | 2× DGX Spark | 1,655 | 49.2 | [55.0%](benches/bfcl-100/recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.md) | **1035** (933–1138) | 100/100 |
+| [DeepSeek-V4.1-Flash · TensorFold TP2](recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.toml) *(anchor)* | EXL3 2.9bpw | low | 2× DGX Spark | 1,056 | 58.4 | [68.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.md) | **1167** (1058–1276) | 100/100 |
+| [DeepSeek-V4.1-Flash · Mia EAQ · TensorFold Zig TP2](recipes/deepseek-v4.1-flash@exl3-eaq-2.9bpw-tensorfold-zig-2xspark.toml) | EXL3 EAQ 2.9bpw | low | 2× DGX Spark | 1,759 | 58.5 | [67.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-eaq-2.9bpw-tensorfold-zig-2xspark.md) | **1156** (1047–1264) | 100/100 |
+| [GLM-5.3-Flash · Mia EXL3 · TensorFold TP2](recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml) | EXL3 4bpw | low | 2× DGX Spark | 1,655 | 49.2 | [55.0%](benches/bfcl-100/recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.md) | **1031** (926–1135) | 100/100 |
 <!-- leaderboard:end -->
 
 ## Benchmarks
