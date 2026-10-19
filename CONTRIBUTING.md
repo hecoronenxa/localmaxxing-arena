@@ -76,7 +76,8 @@ fresh random prefix so nothing comes from the prefix cache, and records the medi
 - **tg** (token generation, decode) = generated tokens / time from first to last token; reasoning tokens count
 
 Run it while the endpoint serves nothing else, from a host on the same network as the server if you
-can. The leaderboard shows each recipe's average over its speed records as *PP 32K* and *TG 32K*. Speed
+can. The leaderboard shows each recipe's average over its speed records as *PP 32K* and *TG 32K*, for
+information only: speed never enters the Rating or the ranking. Speed
 records are small JSON files committed directly with the PR, no evidence needed; CI checks that the
 recipe still matches and the settings and medians are intact.
 
