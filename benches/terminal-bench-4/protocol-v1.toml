@@ -2,9 +2,11 @@
 # from different protocols are not comparable. Change nothing here for a submission — add a v2 instead.
 
 bench = "terminal-bench-4"
+display_name = "Terminal-Bench 4.0"   # leaderboard column header
 name = "v1"
+retired = false                       # true drops the bench's leaderboard column; results stay in RESULTS.md
 runner = "harbor"
-harbor_version = "0.24.0"          # uv tool install harbor==0.24.0
+harbor_version = "0.24.0"             # uv tool install harbor==0.24.0
 
 [suite]
 dataset = "terminal-bench/terminal-bench"

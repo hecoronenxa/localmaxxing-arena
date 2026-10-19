@@ -11,7 +11,9 @@ One file per endpoint in [recipes/](recipes/), named `<model>@<recipe>.toml`. Co
 |---|---|
 | `role` | `local` (competes) or `reference` (official API, a reference line) |
 | `model_family` | ties a recipe to its API reference, e.g. `DeepSeek-V4.1-Flash-1017` |
-| `weights`, `serving`, `hardware` | enough to rebuild it: repo @ revision, quant, engine @ commit, flags that matter |
+| `display_name` | leaderboard name: model · engine, e.g. `DeepSeek-V4.1-Flash · TensorFold TP2` |
+| `weights`, `hardware` | short leaderboard labels, e.g. `EXL3 2.9bpw`, `2× DGX Spark` |
+| `weights_detail`, `serving`, `hardware_detail` | enough to rebuild it: repo @ revision, quant, engine @ commit, flags that matter |
 | `model`, `api_base`, `api_key_env` | any OpenAI-compatible endpoint: `model = "openai/<served name>"` |
 | `n_concurrent` | parallel trials; no more than the server's parallel streams |
 
@@ -59,8 +61,17 @@ recipe copies match the repo, the Harbor config is exactly what `run.py` generat
 `attempts` times, the evidence archive is recorded, and generated files are fresh. Reviewers compare the
 attached archive's sha256 with `run.json` and spot-check trajectories.
 
-Protocols don't change in place: a new setting means a new `protocol-v<N>.toml`, and its results form a
-separate leaderboard.
+## Benchmarks and protocols
+
+The README leaderboard has one column per active benchmark, showing results under that benchmark's
+latest protocol.
+
+- **Change a benchmark's settings:** add `protocol-v<N+1>.toml`; never edit one that has results. The
+  column switches to v<N+1>, and recipes reappear in it once rerun. Older results stay in RESULTS.md.
+- **Add a benchmark:** add `benches/<bench>/` with a README and `protocol-v1.toml`; it becomes a new
+  column. *Overall* then needs a result on it too.
+- **Drop a benchmark:** set `retired = true` in its latest protocol. The column goes away; its results
+  stay in RESULTS.md.
 
 ## Layout
 

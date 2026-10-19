@@ -1,10 +1,12 @@
 id = "deepseek-v4.1-flash@deepseek-api"
 role = "reference"                 # official API: the bar local recipes are measured against
 model_family = "DeepSeek-V4.1-Flash-1017"
-display_name = "DeepSeek-V4.1-Flash (official API)"
-weights = "first-party (DeepSeek API, model `deepseek-flash`)"
+display_name = "DeepSeek-V4.1-Flash · official API"
+weights = "official"               # short, for the leaderboard
+hardware = "DeepSeek API"
+weights_detail = "first-party (DeepSeek API, model `deepseek-flash`)"
 serving = "api.deepseek.com"
-hardware = "-"
+hardware_detail = "-"
 
 model = "openai/deepseek-flash"    # LiteLLM name; `openai/` = OpenAI-compatible chat completions
 api_base = "https://api.deepseek.com/v1"

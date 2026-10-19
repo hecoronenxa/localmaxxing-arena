@@ -6,9 +6,11 @@ line (`ref`): it shows how much a recipe gives up, or doesn't.
 
 ## Leaderboard
 
-Recipe names link to the recipe (weights, engine, flags, hardware); scores link to the run's per-task
-stats. Per-task results and agent behaviour (tokens, tool calls, parse errors, cut-off replies) are in
-[RESULTS.md](RESULTS.md).
+One row per recipe and one column per benchmark. Each column shows the benchmark's latest protocol.
+*Overall* is the mean over all benchmarks, shown once a recipe has run on every one of them. Recipe names
+link to the recipe (exact weights, engine, flags, hardware), and scores link to the run's per-task stats.
+`ref` rows are official APIs. Per-task results and agent behaviour (tokens, tool calls, parse errors,
+cut-off replies) are in [RESULTS.md](RESULTS.md).
 
 <!-- leaderboard:start -->
 _No results yet._
