@@ -1,0 +1,3 @@
+runs/_scratch*
+__pycache__/
+.DS_Store

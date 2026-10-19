@@ -1,0 +1,40 @@
+# Terminal-Bench 4.0, protocol v1. Every row in RESULTS.md names the protocol it ran under; results
+# from different protocols are not comparable. Change nothing here for a submission — add a v2 instead.
+
+bench = "terminal-bench-4"
+name = "v1"
+runner = "harbor"
+harbor_version = "0.24.0"          # uv tool install harbor==0.24.0
+
+[suite]
+dataset = "terminal-bench/terminal-bench"
+version = "4.0.0"
+tasks = [
+  "interleaved-vigenere",
+  "sound-change-cascade",
+  "music-harmony",
+  "photonic-waveguide-routing",
+  "html-js-filter",
+  "foodstuff-beta-activity",
+  "cargo-flight-dispatch",
+  "freecad-spring-clip",
+  "freecad-platform-drawing",
+  "bun-sourcemap-leak",
+]
+n_attempts = 5                     # TB 4.0 official; `run.py --attempts 1` makes a smoke run, flagged in RESULTS.md
+
+[agent]
+name = "terminus-2"
+reasoning_effort = "max"
+temperature = 1.0
+# Context budget per trial = 196,608 prompt + 65,536 reply = 262,144 tokens. This fits a local server
+# that shares a 1M KV window across 4 streams, and it is applied to every endpoint, API or local, so
+# all rows see the same context limit. The reply cap is sent as max_tokens on every call (servers that
+# default to 4,096 would otherwise cut max-effort thinking short).
+max_input_tokens = 196608
+max_output_tokens = 65536
+
+[job]
+timeout_multiplier = 1.0           # task.toml timeouts as published (agent 8 h)
+max_retries = 2                    # infrastructure errors only; Harbor never retries agent/verifier timeouts
+environment = "docker"

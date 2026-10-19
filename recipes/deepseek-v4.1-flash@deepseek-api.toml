@@ -1,0 +1,17 @@
+id = "deepseek-v4.1-flash@deepseek-api"
+role = "reference"                 # official API: the bar local recipes are measured against
+model_family = "DeepSeek-V4.1-Flash-1017"
+display_name = "DeepSeek-V4.1-Flash (official API)"
+weights = "first-party (DeepSeek API, model `deepseek-flash`)"
+serving = "api.deepseek.com"
+hardware = "-"
+
+model = "openai/deepseek-flash"    # LiteLLM name; `openai/` = OpenAI-compatible chat completions
+api_base = "https://api.deepseek.com/v1"
+api_key_env = "DEEPSEEK_API_KEY"
+n_concurrent = 10                  # no endpoint limit; trial containers idle at ~100 MB, so all 10 tasks at once
+
+[pricing]                          # USD per 1M tokens, peak rate (off-peak is half), 2026-10-19
+input = 0.30
+cached_input = 0.006
+output = 1.20

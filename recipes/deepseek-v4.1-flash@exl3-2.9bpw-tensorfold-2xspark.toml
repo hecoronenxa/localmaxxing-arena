@@ -1,0 +1,12 @@
+id = "deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark"
+role = "local"                     # a recipe you can run at home
+model_family = "DeepSeek-V4.1-Flash-1017"
+display_name = "DeepSeek-V4.1-Flash EXL3 2.9bpw (2× DGX Spark)"
+weights = "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw @ afc7aa0a + official Engram shards @ 1bae0e10"
+serving = "bertholomus/TensorFold deepseek-v41-tp2 @ 8e0966e (TP2) + image-limit patch layer; recipe lucataco/DeepSeek-V4.1-Flash-2x-DGX-Spark @ 7b46f9d; CONTEXT=1048576 PARALLEL=4 MTP_DRAFTS=5"
+hardware = "2× NVIDIA DGX Spark (GB10, 128 GB), CX7 RoCE, GPU clocks locked 0-2200 MHz"
+
+model = "openai/deepseek-v4.1-flash"
+api_base = "http://192.168.0.112:8888/v1"
+api_key_env = ""                   # server takes no key
+n_concurrent = 4                   # = server PARALLEL; 4 × 262,144 fills the 1M shared KV window
