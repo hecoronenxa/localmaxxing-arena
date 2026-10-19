@@ -1,0 +1,44 @@
+{
+  "recipe_file": "recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml",
+  "recipe": {
+    "id": "glm-5.3-flash@exl3-4bpw-tensorfold-2xspark",
+    "model": "openai/glm-5.3-flash",
+    "api_base": "http://192.168.0.112:8888/v1"
+  },
+  "date": "2026-10-19T15:48:59+00:00",
+  "context_tokens": 32768,
+  "generate_tokens": 512,
+  "concurrency": 1,
+  "host": {
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64"
+  },
+  "samples": [
+    {
+      "prompt_tokens": 32158,
+      "ttft_s": 19.308,
+      "pp_tok_s": 1665.6,
+      "completion_tokens": 512,
+      "decode_s": 11.083,
+      "tg_tok_s": 46.1
+    },
+    {
+      "prompt_tokens": 32146,
+      "ttft_s": 19.427,
+      "pp_tok_s": 1654.7,
+      "completion_tokens": 512,
+      "decode_s": 10.385,
+      "tg_tok_s": 49.2
+    },
+    {
+      "prompt_tokens": 32155,
+      "ttft_s": 19.594,
+      "pp_tok_s": 1641.1,
+      "completion_tokens": 512,
+      "decode_s": 9.066,
+      "tg_tok_s": 56.4
+    }
+  ],
+  "pp_tok_s": 1654.7,
+  "tg_tok_s": 49.2
+}

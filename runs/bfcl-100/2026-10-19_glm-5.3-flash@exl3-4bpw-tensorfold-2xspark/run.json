@@ -1,0 +1,62 @@
+{
+  "bench": "bfcl-100",
+  "recipe_file": "recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml",
+  "recipe": {
+    "id": "glm-5.3-flash@exl3-4bpw-tensorfold-2xspark",
+    "role": "local",
+    "model_family": "GLM-5.3-Flash",
+    "display_name": "GLM-5.3-Flash \u00b7 Mia EXL3 \u00b7 TensorFold TP2",
+    "weights": "EXL3 4bpw",
+    "hardware": "2\u00d7 DGX Spark",
+    "weights_detail": "Mia-AiLab/GLM-5.3-Flash-EXL3-4bpw-TensorFold @ 078455ff, dense fp8",
+    "serving": "TensorFold (Python CUDA) v0.6.0-e66c657a433d + patch layer 0112/0113/0115; recipe MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks-TensorFold @ 3fd60df; PARALLEL=8 DENSE=fp8",
+    "hardware_detail": "2\u00d7 NVIDIA DGX Spark (GB10, 128 GB), CX7 RoCE, GPU clocks locked 0-2200 MHz",
+    "model": "openai/glm-5.3-flash",
+    "api_base": "http://192.168.0.112:8888/v1",
+    "n_concurrent": 8
+  },
+  "attempts": 1,
+  "finished": true,
+  "runner": "inspect",
+  "harness": "inspect-ai==0.3.281 + inspect_evals[bfcl] @ git+https://github.com/UKGovernmentBEIS/inspect_evals@8ef810f09930362302fc59b10a382d96dd767171 + openai==3.35.1",
+  "host": {
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "node": "macmini.local",
+    "docker": {
+      "ServerVersion": "",
+      "NCPU": 0,
+      "MemTotal": 0,
+      "Architecture": ""
+    }
+  },
+  "started_at": "2026-10-19T15:49:03+00:00",
+  "parts": [
+    {
+      "job_name": "2026-10-19_glm-5.3-flash@exl3-4bpw-tensorfold-2xspark",
+      "attempts": 1,
+      "n_concurrent": 8,
+      "config": "inspect-config-p1.json",
+      "started_at": "2026-10-19T15:49:03+00:00",
+      "host": {
+        "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "machine": "arm64",
+        "node": "macmini.local",
+        "docker": {
+          "ServerVersion": "",
+          "NCPU": 0,
+          "MemTotal": 0,
+          "Architecture": ""
+        }
+      },
+      "finished": true,
+      "evidence": {
+        "archive": "2026-10-19_glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.tar.gz",
+        "bytes": 5462138,
+        "sha256": "eb01fd493537e04efa9224f48e1f3dd8a62cd560b073c10c30789ca395550d33",
+        "pieces": [],
+        "url": null
+      }
+    }
+  ]
+}
