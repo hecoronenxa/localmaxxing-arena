@@ -13,6 +13,7 @@ agent behaviour (tokens, tool calls, parse errors, cut-off replies). The table i
 after every merge.
 
 <!-- leaderboard:start -->
+_No results yet._
 <!-- leaderboard:end -->
 
 ## Benchmarks
