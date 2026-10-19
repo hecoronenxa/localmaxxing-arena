@@ -27,5 +27,7 @@ _No results yet._
 
 ## Contributing
 
-Ran a model on your own hardware? Add it. [CONTRIBUTING.md](CONTRIBUTING.md) covers writing a recipe,
-running a bench, and submitting the result as a pull request.
+Ran a model on your own hardware? Add it: [CONTRIBUTING.md](CONTRIBUTING.md) covers writing a recipe,
+running a benchmark and submitting the result as a pull request. A single result is enough to get on
+the leaderboard, and runs from different people pool. Want a model benchmarked but can't run it?
+[Open a recipe request](https://github.com/kky42/localmaxxing-arena/issues/new?template=recipe-request.yml).

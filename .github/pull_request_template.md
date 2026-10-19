@@ -1,27 +1,29 @@
-<!-- One PR per run. Title: "<bench>: <recipe id> (k=N)" -->
+<!-- Title: "<bench>: <recipe id> (k=N)". A PR may carry one run or several; see CONTRIBUTING.md. -->
 
-## Run
+## Runs
 
-- Bench:
-- Recipe: `recipes/<id>.toml` (new / existing)
-- Score:
-- Run dir: `runs/<bench>/<run>/`
+<!-- One row per run directory added by this PR. Score and k are printed by `uv run scripts/summarize.py`. -->
+
+| Run (`runs/<bench>/<run>/`) | Recipe | k (results) | Score | Evidence | sha256 |
+|---|---|---|---|---|---|
+| | | | | <!-- attachment link(s) --> | <!-- shasum -a 256 evidence/<bench>/<run>.tar.gz --> |
+
+- New recipe file? <!-- yes: recipes/<id>.toml / no -->
 
 ## Evidence
 
-Attach `evidence/<bench>/<run>.tar.gz` to this PR (drag it into this description or a comment; GitHub
-takes files up to 25 MB, split larger archives or link to them). Its sha256 must match `evidence.sha256` in
+Attach each run's `evidence/<bench>/<run>.tar.gz` (or all of its `<run>.partNN.gz` pieces if it was
+split) to this description or a comment. Its sha256 must match `evidence.sha256` in the run's
 `run.json`.
-
-- Archive: <!-- attachment or link -->
-- sha256: <!-- shasum -a 256 evidence/<bench>/<run>.tar.gz -->
 
 ## Checklist
 
-- [ ] Ran `uv run scripts/run.py <bench> recipes/<id>.toml` unchanged (no edits to `benches/`)
+- [ ] Each run was made with `uv run scripts/run.py <bench> recipes/<id>.toml [--attempts N]`, nothing else changed (no edits to `benches/`)
+- [ ] The endpoint served the recipe exactly as its file describes (weights revision, engine commit, flags, hardware)
+- [ ] New recipe: a new `id`, with `weights_detail`, `serving` and `hardware_detail` complete enough to rebuild it
 - [ ] `uv run scripts/check.py` passes locally
-- [ ] Only raw data committed (recipe, `runs/<bench>/<run>/`); generated tables are rebuilt after merge
-- [ ] Recipe file names exact weights (repo @ revision), engine @ commit, launch flags and hardware
-- [ ] Anything unusual during the run (restarts, errors, server changes) is described below
+- [ ] Only raw data committed (`runs/<bench>/<run>/`, plus the recipe file if new); no README, RESULTS.md or recipe pages
+- [ ] Evidence attached for every run
+- [ ] Anything unusual (server restarts, errors, retries, other load on the endpoint) is described below
 
 ## Notes

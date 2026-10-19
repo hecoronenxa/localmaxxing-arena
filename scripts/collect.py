@@ -9,8 +9,9 @@
 
 Reads evidence/<bench>/<job>/ for every part of the run (git-ignored: trajectories, terminal recordings,
 verifier logs) and writes runs/<bench>/<run>/trials.jsonl, one line of core stats per finished trial.
-With --pack, writes evidence/<bench>/<job>.tar.gz per finished part and records its name, size and
-sha256 under the part's "evidence" in run.json; attach the archives to the PR.
+With --pack, writes evidence/<bench>/<run>.tar.gz once the run is finished and records its name, size and
+sha256 in run.json; an archive over 24 MB is also split into <run>.part01.gz, .part02.gz, ... for upload
+(GitHub's attachment limit is 25 MB; `cat <run>.part*.gz > <run>.tar.gz` restores it). Attach the archive or its pieces to the PR.
 """
 import argparse, hashlib, json, statistics, subprocess, sys, tomllib
 from datetime import datetime
@@ -109,6 +110,26 @@ def sha256(path):
     return h.hexdigest()
 
 
+PIECE = 24 * 1000 * 1000  # GitHub takes attachments up to 25 MB
+
+
+def split(archive):
+    """Split an archive too large to attach into <run>.part01.gz, .part02.gz, ... The pieces are not gzip
+    files on their own (the .gz only satisfies GitHub's attachment filter); cat them back in order."""
+    stem = archive.name.removesuffix(".tar.gz")
+    for old in archive.parent.glob(f"{stem}.part*.gz"):
+        old.unlink()
+    if archive.stat().st_size <= PIECE:
+        return []
+    pieces = []
+    with open(archive, "rb") as f:
+        while chunk := f.read(PIECE):
+            piece = archive.with_name(f"{stem}.part{len(pieces) + 1:02d}.gz")
+            piece.write_bytes(chunk)
+            pieces.append(piece)
+    return pieces
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir", type=Path)
@@ -137,9 +158,11 @@ def main():
         if args.pack and part["finished"] and not part.get("evidence"):
             archive = ev.parent / f"{ev.name}.tar.gz"
             subprocess.run(["tar", "-czf", str(archive), "-C", str(ev.parent), ev.name], check=True)
+            pieces = split(archive)
             part["evidence"] = {"archive": archive.name, "bytes": archive.stat().st_size,
-                                "sha256": sha256(archive), "url": None}
-            print(f"evidence {archive} {archive.stat().st_size / 1e6:.1f} MB sha256 {part['evidence']['sha256']}")
+                                "sha256": sha256(archive), "pieces": [q.name for q in pieces], "url": None}
+            print(f"evidence {archive} {archive.stat().st_size / 1e6:.1f} MB sha256 {part['evidence']['sha256']}"
+                  + (f", split into {len(pieces)} pieces for upload" if pieces else ""))
         print(f"{part['job_name']}: {len(part_rows)} finished trials (job finished: {part['finished']})")
     (run_dir / "trials.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     meta["finished"] = all(p["finished"] for p in meta["parts"])

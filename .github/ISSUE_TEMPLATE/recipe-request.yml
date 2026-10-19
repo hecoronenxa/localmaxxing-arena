@@ -1,0 +1,66 @@
+name: Recipe request
+description: Ask for a model / quantized weights / serving setup to be benchmarked, or volunteer to run one.
+title: "Recipe request: <model> <quant> on <hardware>"
+labels: ["recipe request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A **recipe** is one way of serving a model: exact weights, engine and flags, hardware. Whoever picks
+        this up writes `recipes/<model>@<recipe>.toml`, runs it with `scripts/run.py`, and opens a pull request
+        with the run and its evidence, following [CONTRIBUTING.md](https://github.com/kky42/localmaxxing-arena/blob/main/CONTRIBUTING.md). One result
+        (k=1) is a useful start; anyone can add more runs later and they pool.
+  - type: input
+    id: weights
+    attributes:
+      label: Weights
+      description: Hugging Face repo @ revision (commit sha), or the API model name for an official API.
+      placeholder: nvidia/GLM-5.3-Flash-FP4-Local @ 76348ddb
+    validations:
+      required: true
+  - type: input
+    id: quant
+    attributes:
+      label: Quantization
+      placeholder: NVFP4 (ModelOpt QAD), FP8 KV cache
+  - type: textarea
+    id: serving
+    attributes:
+      label: Serving
+      description: Engine and version / container image, launch command and the flags that matter. Unknown is fine; say so.
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware
+      placeholder: 2× NVIDIA DGX Spark
+    validations:
+      required: true
+  - type: dropdown
+    id: bench
+    attributes:
+      label: Benchmark
+      options:
+        - terminal-bench-4
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: API reference (optional)
+      description: The model's official API, if it should also be run as a reference line.
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Endpoint requirements
+      description: Leave as is unless the benchmark changes.
+      value: |
+        - OpenAI-compatible `/v1/chat/completions`, reachable from the runner host
+        - Accepts `reasoning_effort: max`, `temperature: 1.0` and `max_tokens: 131072` on every request
+        - Context of 131,072 prompt + 131,072 reply tokens per parallel stream; set `n_concurrent` to the number of streams that fit
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Known issues, expected throughput, who plans to run it.
