@@ -20,7 +20,7 @@ jobs:
       - run: uv run scripts/summarize.py
       - name: commit generated files
         run: |
-          git add -A README.md benches runs
+          git add -A
           if git diff --cached --quiet; then echo "up to date"; exit 0; fi
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -m "Regenerate leaderboard"
