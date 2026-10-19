@@ -11,7 +11,7 @@
 | Reasoning | `reasoning_effort: max`, `temperature: 1.0` |
 | Context | 131,072 prompt + 131,072 reply = **262,144 tokens** per trial, for every endpoint; `max_tokens: 131072` sent on every call |
 | Attempts | k = 3 per task (TB official is 5). Runs of any k pool per recipe; below 3 the score is flagged *k=1/3* |
-| Timeouts | as published in each `task.toml` (agent 8 h), multiplier 1.0 |
+| Timeouts | as published in each `task.toml` (agent 8 h), multiplier 1.0; each LLM request may take up to 3 h |
 | Retries | up to 2, infrastructure errors only (never agent/verifier timeouts) |
 | Score | mean reward over all trials; errored or timed-out trials score 0; 95% Wilson interval |
 

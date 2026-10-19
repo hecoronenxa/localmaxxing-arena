@@ -45,7 +45,9 @@ change results changes** (weights revision, quantization, engine commit, flags t
 Reasoning effort, sampling temperature, context budget and timeouts are set by the benchmark, not the
 recipe, so every recipe runs under the same conditions. Your endpoint must accept them: for Terminal-Bench
 4 that is `reasoning_effort: max`, `temperature: 1.0` and `max_tokens: 131072` on every request, with a
-262,144-token window per parallel stream (see [the bench's README](benches/terminal-bench-4/README.md)).
+262,144-token window per parallel stream, and a single request may run for up to 3 hours (see
+[the bench's README](benches/terminal-bench-4/README.md)); make sure no proxy or load balancer in between
+cuts long requests.
 
 ## 2. Run it
 

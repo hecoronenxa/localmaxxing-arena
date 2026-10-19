@@ -60,7 +60,7 @@ def harbor_config(bench, model, attempts, n_concurrent, job_name, jobs_dir):
                 "reasoning_effort": agent["reasoning_effort"],
                 "temperature": agent["temperature"],
                 "model_info": model_info,
-                "llm_kwargs": {"max_tokens": agent["max_output_tokens"]},
+                "llm_kwargs": {"max_tokens": agent["max_output_tokens"], "timeout": agent["request_timeout_sec"]},
             },
         }],
     }
