@@ -15,6 +15,7 @@ behaviour. *API reference* rows are official APIs; *anchor* recipes run every be
 comparable across them. The table is rebuilt automatically after every merge.
 
 <!-- leaderboard:start -->
+_No results yet._
 <!-- leaderboard:end -->
 
 ## Benchmarks
