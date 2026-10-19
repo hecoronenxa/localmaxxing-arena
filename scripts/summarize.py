@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Rebuild RESULTS.md and each run's STATS.md from runs/<bench>/*/run.json and trials.jsonl.
+"""Rebuild the README leaderboard, RESULTS.md and each run's STATS.md from runs/<bench>/*/run.json and trials.jsonl.
 
     uv run scripts/summarize.py            # write
     uv run scripts/summarize.py --check    # exit 1 if any generated file is stale (CI)
@@ -118,40 +118,48 @@ def run_stats(bench, meta, s, tasks):
     return "\n".join(lines) + "\n"
 
 
+def leaderboard(bench, rows, refs):
+    """Ranked table: recipe name links to its recipe file, score links to the run's STATS.md."""
+    out = ["| # | Recipe | Hardware | k | Score (95% CI) | vs API | Trials · errored | Cost | Median agent time |",
+           "|---|---|---|---|---|---|---|---|---|"]
+    rank = 0
+    for m, s, d in rows:
+        r = m["recipe"]
+        local = r.get("role") != "reference"
+        rank += local
+        n = len(s["trials"])
+        flags = (" *(smoke)*" if m.get("smoke") else "") + (f" *(running {n}/{s['expected']})*" if n < s["expected"] else "")
+        ref = refs.get(r["model_family"])
+        delta = f"{(s['score'] - ref) * 100:+.1f} pt" if local and ref is not None else "-"
+        lo, hi = s["ci"]
+        out.append(
+            f"| {rank if local else 'ref'} | [{r['display_name']}]({m['recipe_file']}){flags} | {r.get('hardware', '-')} | "
+            f"{m['attempts']} | [**{s['score']:.1%}**](runs/{bench}/{d.name}/STATS.md) ({lo:.0%}–{hi:.0%}) | {delta} | "
+            f"{n}/{s['expected']} · {s['errors']} | {'$%.2f' % s['cost'] if s['cost'] else '-'} | "
+            f"{'%.0f min' % s['median_min'] if s['median_min'] is not None else '-'} |")
+    return out
+
+
 def bench_section(bench_dir, files):
+    """(RESULTS.md lines, README leaderboard lines) for one bench; adds each run's STATS.md to files."""
     protocols = {}
     for f in bench_dir.glob("protocol-v*.toml"):
         p = tomllib.loads(f.read_text())
         protocols[p["name"]] = p
     runs = [(json.loads(d.read_text()), d.parent) for d in sorted((ROOT / "runs" / bench_dir.name).glob("*/run.json"))]
-    out = []
+    out, board = [], []
     for name in sorted({m["protocol"] for m, _ in runs}):
         tasks = protocols[name]["suite"]["tasks"]
         rows = [(m, score_run(m, load_trials(d), len(tasks)), d) for m, d in runs if m["protocol"] == name]
         rows.sort(key=lambda r: (r[0]["recipe"].get("role") == "reference", -r[1]["score"]))
         refs = {m["recipe"]["model_family"]: s["score"] for m, s, _ in rows
                 if m["recipe"].get("role") == "reference" and not m.get("smoke")}
-        out += [f"## {bench_dir.name} · protocol {name}", "",
-                f"Settings: [benches/{bench_dir.name}/protocol-{name}.toml](benches/{bench_dir.name}/protocol-{name}.toml)", "",
-                "| # | Recipe | Role | k | Score (95% CI) | vs API | Trials done · errored | Cost | Median agent time |",
-                "|---|---|---|---|---|---|---|---|---|"]
-        rank = 0
         for m, s, d in rows:
-            r = m["recipe"]
-            local = r.get("role") != "reference"
-            rank += local
-            n = len(s["trials"])
-            flags = (" *(smoke)*" if m.get("smoke") else "") + (f" *(running {n}/{s['expected']})*" if n < s["expected"] else "")
-            ref = refs.get(r["model_family"])
-            delta = f"{(s['score'] - ref) * 100:+.1f} pt" if local and ref is not None else "-"
-            lo, hi = s["ci"]
-            stats = f"runs/{bench_dir.name}/{d.name}/STATS.md"
-            out.append(
-                f"| {rank if local else ''} | [{r['display_name']}]({stats}){flags} | "
-                f"{'API reference' if not local else 'local'} | {m['attempts']} | **{s['score']:.1%}** ({lo:.0%}–{hi:.0%}) | "
-                f"{delta} | {n}/{s['expected']} · {s['errors']} | {'$%.2f' % s['cost'] if s['cost'] else '-'} | "
-                f"{'%.0f min' % s['median_min'] if s['median_min'] is not None else '-'} |")
-            files[ROOT / stats] = run_stats(bench_dir.name, m, s, tasks)
+            files[ROOT / "runs" / bench_dir.name / d.name / "STATS.md"] = run_stats(bench_dir.name, m, s, tasks)
+        title = f"{bench_dir.name} · protocol {name}"
+        settings = f"[benches/{bench_dir.name}/protocol-{name}.toml](benches/{bench_dir.name}/protocol-{name}.toml)"
+        board += [f"### {title}", "", *leaderboard(bench_dir.name, rows, refs), ""]
+        out += [f"## {title}", "", f"Settings: {settings}", "", *leaderboard(bench_dir.name, rows, refs)]
         out += ["", "Per task (passes / trials):", "",
                 "| Recipe | " + " | ".join(f"`{t}`" for t in tasks) + " |",
                 "|---|" + "---|" * len(tasks)]
@@ -164,24 +172,35 @@ def bench_section(bench_dir, files):
             out.append(f"| {m['recipe']['display_name']}{' *(smoke)*' if m.get('smoke') else ''} | " + " | ".join(cells) + " |")
         out += ["", "Behaviour (per-task breakdown in each run's STATS.md):", "", BEHAVIOUR_NOTE, ""]
         out += behaviour_table("Recipe", [(m["recipe"]["display_name"] + (" *(smoke)*" if m.get("smoke") else ""), s["trials"])
-                                for m, s, _ in rows])
+                                          for m, s, _ in rows])
         out.append("")
-    return out
+    return out, board
+
+
+BOARD_START, BOARD_END = "<!-- leaderboard:start -->", "<!-- leaderboard:end -->"
 
 
 def render():
-    """Every generated file: {path: content}."""
+    """Every generated file: {path: content}. README.md only has its leaderboard block replaced."""
     files = {}
     lines = ["# Results", "",
              "Generated by `scripts/summarize.py`; do not edit by hand. Local recipes are ranked by score; "
-             "official APIs are reference lines, and *vs API* is the gap to the same model's API reference "
+             "official APIs are reference lines (`ref`), and *vs API* is the gap to the same model's API reference "
              "(full runs only). Smoke runs (k < protocol) are noisy.", "",
              "Score = mean reward over all trials; a trial that errors or times out scores 0. "
              "`err` = trial raised an exception (timeout, context overflow, infrastructure).", ""]
+    board = []
     for bench_dir in sorted((ROOT / "benches").iterdir()):
         if bench_dir.is_dir():
-            lines += bench_section(bench_dir, files)
+            section, b = bench_section(bench_dir, files)
+            lines += section
+            board += b
     files[ROOT / "RESULTS.md"] = "\n".join(lines)
+    readme = (ROOT / "README.md").read_text()
+    head, rest = readme.split(BOARD_START, 1)
+    tail = rest.split(BOARD_END, 1)[1]
+    body = "\n".join(board) if board else "_No results yet._\n"
+    files[ROOT / "README.md"] = f"{head}{BOARD_START}\n{body}{BOARD_END}{tail}"
     return files
 
 
