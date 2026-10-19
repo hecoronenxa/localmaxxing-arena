@@ -27,12 +27,13 @@ n_attempts = 3                     # TB 4.0 official is 5; 3 cuts wall time by 4
 name = "terminus-2"
 reasoning_effort = "max"
 temperature = 1.0
-# Context budget per trial = 196,608 prompt + 65,536 reply = 262,144 tokens. This fits a local server
+# Context budget per trial = 131,072 prompt + 131,072 reply = 262,144 tokens. This fits a local server
 # that shares a 1M KV window across 4 streams, and it is applied to every endpoint, API or local, so
-# all rows see the same context limit. The reply cap is sent as max_tokens on every call (servers that
-# default to 4,096 would otherwise cut max-effort thinking short).
-max_input_tokens = 196608
-max_output_tokens = 65536
+# local recipes and API references see the same limit. Max-effort replies run past 64K (a 196K + 64K
+# split cut replies off in the first smoke run), so the budget is split evenly. The reply cap is sent
+# as max_tokens on every call (servers that default to 4,096 would otherwise cut thinking short).
+max_input_tokens = 131072
+max_output_tokens = 131072
 
 [job]
 timeout_multiplier = 1.0           # task.toml timeouts as published (agent 8 h)
