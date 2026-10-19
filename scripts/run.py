@@ -4,9 +4,9 @@
 # ///
 """Run one recipe on one benchmark (benches/<bench>/bench.toml).
 
-    uv run scripts/run.py terminal-bench-4 recipes/<id>.toml --attempts 1     # one attempt per task
-    uv run scripts/run.py terminal-bench-4 recipes/<id>.toml                  # the bench's n_attempts
-    uv run scripts/run.py terminal-bench-4 recipes/<id>.toml --resume runs/terminal-bench-4/<run>
+    uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1     # one attempt per task
+    uv run scripts/run.py <bench> recipes/<id>.toml                  # the bench's n_attempts
+    uv run scripts/run.py <bench> recipes/<id>.toml --resume runs/<bench>/<run>
 
 Every run is a standalone contribution; scripts/summarize.py pools all runs of a recipe on a bench, so
 more attempts later are simply another run (by anyone, on any host). --resume continues an interrupted
@@ -84,7 +84,7 @@ def host_info():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("bench", help="directory name under benches/, e.g. terminal-bench-4")
+    ap.add_argument("bench", help="directory name under benches/")
     ap.add_argument("model", type=Path, help="recipes/<id>.toml")
     ap.add_argument("--attempts", type=int, help="attempts per task (default: the bench's n_attempts)")
     ap.add_argument("--n-concurrent", type=int, help="override the recipe's n_concurrent (host limits)")

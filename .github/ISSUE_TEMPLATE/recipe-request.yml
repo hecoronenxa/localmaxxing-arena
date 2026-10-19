@@ -42,7 +42,7 @@ body:
     attributes:
       label: Benchmark
       options:
-        - terminal-bench-4
+        - any
     validations:
       required: true
   - type: input

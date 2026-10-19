@@ -13,7 +13,7 @@ request. Every result lands this way, ours included. Want a recipe benchmarked b
 - **Run**: one invocation of `scripts/run.py`, producing one or more results (`--attempts N` = N
   results). A run is stored as `runs/<bench>/<run>/`.
 - **k**: the number of results a recipe has on a benchmark, summed over all its runs. Each benchmark
-  sets a target (3 for Terminal-Bench 4).
+  sets a target (`n_attempts` in its `bench.toml`).
 
 All runs of the same recipe on the same benchmark are **pooled** into one score. Any k is accepted: a
 single result (k=1) is a useful PR. Below the benchmark's target the score is flagged *k=1/3* on the
@@ -43,22 +43,20 @@ change results changes** (weights revision, quantization, engine commit, flags t
 `*_detail`) can be corrected at any time.
 
 Reasoning effort, sampling temperature, context budget and timeouts are set by the benchmark, not the
-recipe, so every recipe runs under the same conditions. Your endpoint must accept them: for Terminal-Bench
-4 that is `reasoning_effort: max`, `temperature: 1.0` and `max_tokens: 131072` on every request, with a
-262,144-token window per parallel stream, and a single request may run for up to 3 hours (see
-[the bench's README](benches/terminal-bench-4/README.md)); make sure no proxy or load balancer in between
-cuts long requests.
+recipe, so every recipe runs under the same conditions. Your endpoint must accept them: each bench's
+README lists the request settings it sends and how long a single request may run; make sure no proxy or
+load balancer in between cuts long requests.
 
 ## 2. Run it
 
 Needs Docker (Colima, OrbStack or Docker Desktop) and [uv](https://docs.astral.sh/uv/); each bench
-README lists its own tools (Terminal-Bench 4: `uv tool install harbor==0.24.0`). Keep the clone in a
+README lists its own tools. Keep the clone in a
 directory Docker can mount (Colima shares only your home directory by default, not `/tmp`): Harbor
 copies the agent's files from the task container into `evidence/` and on to the verifier.
 
 ```bash
 uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1   # one result: the cheapest useful run
-uv run scripts/run.py <bench> recipes/<id>.toml                # the bench's target (k=3 for Terminal-Bench 4)
+uv run scripts/run.py <bench> recipes/<id>.toml                # the bench's target k
 uv run scripts/run.py <bench> recipes/<id>.toml --resume runs/<bench>/<run>   # continue an interrupted run
 uv run scripts/collect.py runs/<bench>/<run>                   # refresh raw metrics mid-run
 ```
@@ -135,7 +133,7 @@ the leaderboard and pages, and commits them.
 A benchmark is everything in `benches/<bench>/bench.toml`: upstream dataset and version, the task list
 with each task's content digest, harness and agent settings, context budget, result target. Once it has
 results it never changes. Any change (new upstream version, tasks added, removed or edited, different
-agent settings) makes a **new benchmark** with a new id, e.g. `terminal-bench-4-r2`, and every recipe
+agent settings) makes a **new benchmark** with a new id, e.g. `<bench>-r2`, and every recipe
 runs it from scratch. Scores are never carried over, not even for tasks that look identical, because a
 different harness, agent setting or task digest changes what a score means. CI enforces this: a run's
 copy of `bench.toml` must equal the current file, and every trial's task digest must match the pin.

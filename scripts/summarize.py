@@ -269,7 +269,7 @@ def render():
     files = {}
     columns = tomllib.loads((ROOT / "leaderboard.toml").read_text())["columns"]
     boards = {}
-    for bench_dir in sorted(d for d in (ROOT / "benches").iterdir() if (d / "bench.toml").exists()):
+    for bench_dir in sorted(d for d in (ROOT / "benches").glob("*") if (d / "bench.toml").exists()):
         bench = bench_dir.name
         spec = tomllib.loads((bench_dir / "bench.toml").read_text())
         runs = [(json.loads(f.read_text()), f.parent) for f in sorted((ROOT / "runs" / bench).glob("*/run.json"))]

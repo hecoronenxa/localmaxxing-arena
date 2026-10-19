@@ -26,7 +26,7 @@ _No results yet._
 
 | Bench | What it measures | Definition | Results |
 |---|---|---|---|
-| [terminal-bench-4](benches/terminal-bench-4/) | Agentic terminal work: 10 Terminal-Bench 4.0.0 tasks with Terminus-2, max reasoning | [bench.toml](benches/terminal-bench-4/bench.toml) | [RESULTS.md](benches/terminal-bench-4/RESULTS.md) |
+| _none yet_ | The first benchmarks are being chosen. | | |
 
 ## Contributing
 
