@@ -1,0 +1,44 @@
+{
+  "recipe_file": "recipes/deepseek-v4.1-flash@deepseek-api.toml",
+  "recipe": {
+    "id": "deepseek-v4.1-flash@deepseek-api",
+    "model": "openai/deepseek-flash",
+    "api_base": "https://api.deepseek.com/v1"
+  },
+  "date": "2026-10-19T06:11:29+00:00",
+  "context_tokens": 32768,
+  "generate_tokens": 512,
+  "concurrency": 1,
+  "host": {
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64"
+  },
+  "samples": [
+    {
+      "prompt_tokens": 31898,
+      "ttft_s": 2.679,
+      "pp_tok_s": 11907.9,
+      "completion_tokens": 512,
+      "decode_s": 2.57,
+      "tg_tok_s": 198.9
+    },
+    {
+      "prompt_tokens": 31929,
+      "ttft_s": 3.07,
+      "pp_tok_s": 10401.1,
+      "completion_tokens": 512,
+      "decode_s": 2.834,
+      "tg_tok_s": 180.3
+    },
+    {
+      "prompt_tokens": 31940,
+      "ttft_s": 2.708,
+      "pp_tok_s": 11796.8,
+      "completion_tokens": 512,
+      "decode_s": 2.742,
+      "tg_tok_s": 186.4
+    }
+  ],
+  "pp_tok_s": 11796.8,
+  "tg_tok_s": 186.4
+}
