@@ -9,8 +9,9 @@ how much a recipe gives up, or doesn't.
 One row per recipe, one score column per current benchmark, ranked by **Rating**: an Elo-scale
 rating fitted on every trial of every benchmark, retired ones included, so recipes that ran only some
 benchmarks still rank fairly against the rest. *Coverage* is how many current tasks a recipe has run;
-fewer tasks means a wider interval. Recipe names link to the recipe (exact weights, engine, flags,
-hardware), scores to the run's per-task stats, and benchmark headers to per-task results and agent
+fewer tasks means a wider interval. Each score pools every run of that recipe; *k=1/3* flags a score
+from fewer attempts than the benchmark defines. Recipe names link to the recipe (exact weights, engine, flags,
+hardware), scores to the recipe's per-task stats and runs, and benchmark headers to per-task results and agent
 behaviour. *API reference* rows are official APIs; *anchor* recipes run every benchmark to keep ratings
 comparable across them. The table is rebuilt automatically after every merge.
 

@@ -1,4 +1,4 @@
-<!-- One PR per run or extension. Title: "<bench>: <recipe id> (k=N)" or "<bench>: extend <recipe id> to k=N" -->
+<!-- One PR per run. Title: "<bench>: <recipe id> (k=N)" -->
 
 ## Run
 
@@ -9,12 +9,12 @@
 
 ## Evidence
 
-Attach the new part's `evidence/<bench>/<job>.tar.gz` to this PR (drag it into this description or a comment; GitHub
-takes files up to 25 MB, split larger archives or link to them). Its sha256 must match the part's
-`evidence.sha256` in `run.json`.
+Attach `evidence/<bench>/<run>.tar.gz` to this PR (drag it into this description or a comment; GitHub
+takes files up to 25 MB, split larger archives or link to them). Its sha256 must match `evidence.sha256` in
+`run.json`.
 
 - Archive: <!-- attachment or link -->
-- sha256: <!-- shasum -a 256 evidence/<bench>/<job>.tar.gz -->
+- sha256: <!-- shasum -a 256 evidence/<bench>/<run>.tar.gz -->
 
 ## Checklist
 

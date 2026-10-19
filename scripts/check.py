@@ -62,8 +62,6 @@ def check_run(run_dir, run_py):
         errs.append("attempts is not the sum of the parts' attempts")
     if spec["harbor_version"] not in meta.get("harbor", ""):
         errs.append(f"ran on {meta.get('harbor')!r}, bench requires Harbor {spec['harbor_version']}")
-    if meta.get("smoke") != (meta["attempts"] != spec["suite"]["n_attempts"]):
-        errs.append("smoke flag does not match attempts vs bench n_attempts")
 
     rows = [json.loads(l) for l in (run_dir / "trials.jsonl").read_text().splitlines() if l.strip()] \
         if (run_dir / "trials.jsonl").exists() else []
@@ -99,20 +97,21 @@ def main():
 
 
 def check_anchors(minimum=2):
-    """Every leaderboard column after the first needs full runs from >= minimum anchor recipes, so its
-    task difficulties are tied to the rating scale the other benches already set."""
+    """Every leaderboard column after the first needs >= minimum anchor recipes whose finished runs pool
+    to the bench's n_attempts, so its task difficulties are tied to the rating scale the other benches set."""
     columns = tomllib.loads((ROOT / "leaderboard.toml").read_text())["columns"]
     ok = True
     for bench in columns[1:]:
-        anchors = set()
+        need = tomllib.loads((ROOT / "benches" / bench / "bench.toml").read_text())["suite"]["n_attempts"]
+        pooled = {}
         for run_json in (ROOT / "runs" / bench).glob("*/run.json"):
             meta = json.loads(run_json.read_text())
             recipe = ROOT / meta["recipe_file"]
-            if (not meta.get("smoke") and meta.get("finished") and recipe.exists()
-                    and tomllib.loads(recipe.read_text()).get("anchor")):
-                anchors.add(meta["recipe_file"])
+            if meta.get("finished") and recipe.exists() and tomllib.loads(recipe.read_text()).get("anchor"):
+                pooled[meta["recipe_file"]] = pooled.get(meta["recipe_file"], 0) + meta["attempts"]
+        anchors = [f for f, k in pooled.items() if k >= need]
         if len(anchors) < minimum:
-            print(f"FAIL leaderboard.toml lists {bench}, which has {len(anchors)} anchor full runs (needs {minimum})")
+            print(f"FAIL leaderboard.toml lists {bench}, which has {len(anchors)} anchors at k>={need} (needs {minimum})")
             ok = False
     return ok
 
