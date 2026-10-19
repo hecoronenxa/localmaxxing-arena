@@ -27,7 +27,7 @@ uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1   # smoke
 uv run scripts/run.py <bench> recipes/<id>.toml                # full: the bench's attempts
 uv run scripts/run.py <bench> recipes/<id>.toml --resume runs/<bench>/<run dir>
 uv run scripts/collect.py runs/<bench>/<run dir>               # refresh raw metrics mid-run
-uv run scripts/summarize.py                                    # rebuild leaderboard, RESULTS.md, STATS.md
+uv run scripts/summarize.py                                    # preview the generated tables
 uv run scripts/check.py                                        # what CI checks on a PR
 ```
 
@@ -48,18 +48,24 @@ logs) stays out of git. `run.py` writes it to `evidence/<bench>/<run>/` (git-ign
 
 ## 4. Open the pull request
 
+A PR carries raw data only: the recipe file (if new) and `runs/<bench>/<run>/` (`run.json`,
+`recipe.toml`, `bench.toml`, `harbor-config.json`, `trials.jsonl`). Don't commit the README leaderboard,
+`benches/<bench>/RESULTS.md` or `STATS.md`; the publish workflow rebuilds them after the merge, so
+concurrent PRs never conflict.
+
 ```bash
-uv run scripts/summarize.py    # README leaderboard, RESULTS.md, runs/<bench>/<run>/STATS.md
-uv run scripts/check.py        # the same checks CI runs
+uv run scripts/check.py        # the same checks CI runs on the PR
+uv run scripts/summarize.py    # optional local preview; don't commit its output
 git checkout -b run/<bench>/<recipe id>
-git add recipes/<id>.toml runs/<bench>/<run>/ README.md RESULTS.md
+git add recipes/<id>.toml runs/<bench>/<run>/
 ```
 
 Open the PR (the template asks for the score and the evidence), then attach
 `evidence/<bench>/<run>.tar.gz` to the description or a comment. CI runs `check.py`: the benchmark is
-unchanged, the recipe still matches, the Harbor config is exactly what `run.py` generates, every task ran
-`attempts` times, the evidence archive is recorded, and generated files are fresh. Reviewers compare the
-attached archive's sha256 with `run.json` and spot-check trajectories.
+unchanged, the recipe still matches, the Harbor config is exactly what `run.py` generates, every trial
+used the pinned task content, every task ran `attempts` times, and the evidence archive is recorded.
+Reviewers compare the attached archive's sha256 with `run.json` and spot-check trajectories. After the
+merge, `.github/workflows/publish.yml` validates `main`, regenerates the tables and commits them.
 
 ## Benchmarks are frozen
 
@@ -78,24 +84,27 @@ each.
   old id in `leaderboard.toml`. Until then both columns can show.
 - **Add a benchmark:** add `benches/<bench>/` (README + `bench.toml`) and list it in `leaderboard.toml`.
   *Overall* then needs a result on it too.
-- **Drop a benchmark:** remove it from `leaderboard.toml`. Its results stay in RESULTS.md.
+- **Retire a benchmark:** remove it from `leaderboard.toml`. Its runs stay in the repo and its
+  `benches/<bench>/RESULTS.md` keeps updating; the README lists it under the table as retired.
 
 ## Layout
 
 ```
 benches/<bench>/README.md          what the bench tests, tasks, how to run
 benches/<bench>/bench.toml         frozen definition (suite + task digests, agent, context, attempts)
+benches/<bench>/RESULTS.md         generated: per-task results and agent behaviour, all recipes
 leaderboard.toml                   benches shown as README leaderboard columns
 recipes/<model>@<recipe>.toml      one endpoint per file
 scripts/run.py                     bench + recipe -> Harbor job -> runs/ + evidence/
 scripts/collect.py                 evidence/ -> runs/<bench>/<run>/trials.jsonl; --pack archives evidence
-scripts/summarize.py               runs/ -> README leaderboard, RESULTS.md, runs/<bench>/<run>/STATS.md
+scripts/summarize.py               runs/ -> README leaderboard, benches/*/RESULTS.md, STATS.md (CI, after merge)
 scripts/check.py                   PR validation (CI)
+.github/workflows/                 check.yml on PRs, publish.yml after merge
 runs/<bench>/<date>_<recipe>[_k<n>]/      in git
   run.json                         what ran: bench, recipe, Harbor version, runner host, evidence sha256
   recipe.toml, bench.toml          copies as of the run
   harbor-config.json               generated Harbor config (no secrets)
   trials.jsonl                     raw metrics, one trial per line
-  STATS.md                         generated per-task breakdown
+  STATS.md                         generated after merge: per-task breakdown
 evidence/<bench>/<run>/ + .tar.gz  git-ignored; attached to the PR
 ```

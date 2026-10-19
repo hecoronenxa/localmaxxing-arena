@@ -8,18 +8,18 @@ how much a recipe gives up, or doesn't.
 
 One row per recipe and one column per benchmark. *Overall* is the mean over all benchmarks, shown once a recipe has run on every one of them. Recipe names
 link to the recipe (exact weights, engine, flags, hardware), and scores link to the run's per-task stats.
-Rows marked *API reference* are official APIs. Per-task results and agent behaviour (tokens, tool calls, parse errors,
-cut-off replies) are in [RESULTS.md](RESULTS.md).
+Rows marked *API reference* are official APIs. Each benchmark header links to its per-task results and
+agent behaviour (tokens, tool calls, parse errors, cut-off replies). The table is rebuilt automatically
+after every merge.
 
 <!-- leaderboard:start -->
-_No results yet._
 <!-- leaderboard:end -->
 
 ## Benchmarks
 
-| Bench | What it measures | Definition |
-|---|---|---|
-| [terminal-bench-4](benches/terminal-bench-4/) | Agentic terminal work: 10 Terminal-Bench 4.0.0 tasks with Terminus-2, max reasoning | [bench.toml](benches/terminal-bench-4/bench.toml) |
+| Bench | What it measures | Definition | Results |
+|---|---|---|---|
+| [terminal-bench-4](benches/terminal-bench-4/) | Agentic terminal work: 10 Terminal-Bench 4.0.0 tasks with Terminus-2, max reasoning | [bench.toml](benches/terminal-bench-4/bench.toml) | [RESULTS.md](benches/terminal-bench-4/RESULTS.md) |
 
 ## Contributing
 

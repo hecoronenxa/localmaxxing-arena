@@ -19,7 +19,8 @@ in `run.json`.
 ## Checklist
 
 - [ ] Ran `uv run scripts/run.py <bench> recipes/<id>.toml` unchanged (no edits to `benches/`)
-- [ ] `uv run scripts/summarize.py` and `uv run scripts/check.py` pass locally
+- [ ] `uv run scripts/check.py` passes locally
+- [ ] Only raw data committed (recipe, `runs/<bench>/<run>/`); generated tables are rebuilt after merge
 - [ ] Recipe file names exact weights (repo @ revision), engine @ commit, launch flags and hardware
 - [ ] Anything unusual during the run (restarts, errors, server changes) is described below
 

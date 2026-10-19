@@ -1,0 +1,27 @@
+# After every merge: validate main, rebuild the README leaderboard, benches/*/RESULTS.md and
+# runs/*/*/STATS.md from the raw data, and commit them if they changed.
+name: publish
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run scripts/check.py
+      - run: uv run scripts/summarize.py
+      - name: commit generated files
+        run: |
+          git add -A README.md benches runs
+          if git diff --cached --quiet; then echo "up to date"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Regenerate leaderboard"
+          git push

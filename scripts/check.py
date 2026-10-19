@@ -10,7 +10,7 @@ A run passes when its bench.toml copy is identical to benches/<bench>/bench.toml
 frozen), its recipe still exists with the same id, model and api_base, its harbor-config.json is exactly
 what scripts/run.py generates from them, it ran on the bench's Harbor version, every trial used the
 pinned task content, trials.jsonl covers every task `attempts` times, the evidence archive is recorded,
-and the generated README / RESULTS.md / STATS.md are up to date.
+and the leaderboard renders. Generated files are not checked: the publish workflow rebuilds them on main.
 """
 import importlib.util, json, sys, tomllib
 from pathlib import Path
@@ -88,10 +88,8 @@ def main():
         for e in errs:
             print(f"     - {e}")
         failed |= bool(errs)
-    stale = [p for p, text in load("summarize").render().items() if not p.exists() or p.read_text() != text]
-    for p in stale:
-        print(f"FAIL {p.relative_to(ROOT)} is stale (run scripts/summarize.py)")
-    sys.exit(1 if failed or stale else 0)
+    load("summarize").render()  # generated files are rebuilt after merge; here only prove the data renders
+    sys.exit(1 if failed else 0)
 
 
 if __name__ == "__main__":
