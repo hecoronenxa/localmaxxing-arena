@@ -9,12 +9,16 @@ CI runs this after every merge to main and commits the output; contributors only
     uv run scripts/summarize.py            # write
     uv run scripts/summarize.py --check    # exit 1 if any generated file is stale (CI)
 
-The README leaderboard has one column per bench in leaderboard.toml; each bench's RESULTS.md has the
-per-task and behaviour comparison. Score = mean reward over all trials of a run (TB convention: a trial that errors or times
+The README leaderboard has one score column per bench in leaderboard.toml and ranks recipes by a
+rating fitted on every trial of every bench, retired ones included (scripts/rating.py). Each bench's
+RESULTS.md has the per-task and behaviour comparison. Score = mean reward over all trials of a run (TB convention: a trial that errors or times
 out scores 0). The 95% interval is Wilson over trials, treating reward >= 1 as a pass.
 """
 import argparse, json, math, statistics, sys, tomllib
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import rating  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -103,8 +107,8 @@ def recipe_of(meta):
 
 
 def name_cell(meta, r):
-    tag = " *(API reference)*" if r.get("role") == "reference" else ""
-    return f"[{r['display_name']}]({meta['recipe_file']}){tag}"
+    tags = (["API reference"] if r.get("role") == "reference" else []) + (["anchor"] if r.get("anchor") else [])
+    return f"[{r['display_name']}]({meta['recipe_file']})" + (f" *({', '.join(tags)})*" if tags else "")
 
 
 def run_stats(bench, meta, s, tasks):
@@ -143,7 +147,8 @@ def bench_section(bench_dir, files):
     runs = [(json.loads(d.read_text()), d.parent) for d in sorted((ROOT / "runs" / bench_dir.name).glob("*/run.json"))]
     rows = [(m, score_run(m, load_trials(d), len(tasks)), d) for m, d in runs]
     rows.sort(key=lambda r: -r[1]["score"])
-    board = {"bench": bench_dir.name, "spec": spec, "cells": {}}
+    board = {"bench": bench_dir.name, "spec": spec, "cells": {},
+             "trials": [(m["recipe_file"], t) for m, s, _ in rows for t in s["trials"]]}
     # One cell per recipe: its newest full run, else its newest smoke run.
     for m, s, d in sorted(rows, key=lambda r: (not r[0].get("smoke"), r[2].name)):
         board["cells"][m["recipe_file"]] = (m, s, d)
@@ -182,37 +187,44 @@ BOARD_START, BOARD_END = "<!-- leaderboard:start -->", "<!-- leaderboard:end -->
 
 
 def readme_board(boards, retired):
-    """One table: a score column per bench listed in leaderboard.toml, and their mean."""
+    """One table: a score column per bench in leaderboard.toml, plus a rating fitted on every bench."""
+    everything = boards + retired
     recipes = {}
-    for b in boards:
+    for b in everything:
         for f, (m, _, _) in b["cells"].items():
             recipes[f] = (m, recipe_of(m))
     out = []
     if not recipes:
         out.append("_No results yet._")
     else:
+        ratings = rating.fit((f, (b["bench"], t["task"]), t["reward"]) for b in everything for f, t in b["trials"])
+        active_tasks = {(b["bench"], t) for b in boards for t in b["spec"]["suite"]["tasks"]}
+
         def cell(b, f):
             if f not in b["cells"]:
-                return "-", None
+                return "-"
             m, s, d = b["cells"][f]
-            return f"[{s['score']:.1%}](runs/{b['bench']}/{d.name}/STATS.md){flags(m, s)}", s["score"]
+            return f"[{s['score']:.1%}](runs/{b['bench']}/{d.name}/STATS.md){flags(m, s)}"
 
         rows = []
         for f, (m, r) in recipes.items():
-            cells = [cell(b, f) for b in boards]
-            scores = [v for _, v in cells if v is not None]
-            overall = statistics.fmean(scores) if len(scores) == len(boards) else None
-            efforts = sorted({b["spec"]["agent"]["reasoning_effort"] for b in boards if f in b["cells"]})
-            rows.append((overall, m, r, cells, ", ".join(efforts)))
-        rows.sort(key=lambda x: (x[0] is None, -(x[0] or 0), x[2]["display_name"]))
+            covered = {(b["bench"], t["task"]) for b in everything for g, t in b["trials"] if g == f}
+            active = len(covered & active_tasks)
+            coverage = f"{active}/{len(active_tasks)}" if active else "retired benches only"
+            if active and len(covered) > active:
+                coverage += f" (+{len(covered) - active} retired)"
+            efforts = sorted({b["spec"]["agent"]["reasoning_effort"] for b in everything if f in b["cells"]})
+            rows.append((ratings[f], m, r, [cell(b, f) for b in boards], ", ".join(efforts), coverage))
+        rows.sort(key=lambda x: (-x[0][0], x[2]["display_name"]))
         out += ["| Recipe | Weights | Reasoning | Hardware | "
-                + " | ".join(f"[{b['spec']['display_name']}](benches/{b['bench']}/RESULTS.md)" for b in boards)
-                + " | Overall |", "|---|---|---|---|" + "---|" * len(boards) + "---|"]
-        for overall, m, r, cells, effort in rows:
+                + "".join(f"[{b['spec']['display_name']}](benches/{b['bench']}/RESULTS.md) | " for b in boards)
+                + "Rating (95% CI) | Coverage |", "|---|---|---|---|" + "---|" * len(boards) + "---|---|"]
+        for (score, half), m, r, cells, effort, coverage in rows:
             out.append(f"| {name_cell(m, r)} | {r.get('weights', '-')} | {effort} | {r.get('hardware', '-')} | "
-                       + " | ".join(c for c, _ in cells) + f" | {'**%.1f%%**' % (overall * 100) if overall is not None else '-'} |")
+                       + "".join(f"{c} | " for c in cells)
+                       + f"**{score:.0f}** ({score - half:.0f}–{score + half:.0f}) | {coverage} |")
     if retired:
-        out += ["", "Retired benchmarks (not in the table; results kept): "
+        out += ["", "Retired benchmarks (no column, still in the rating): "
                 + ", ".join(f"[{b['spec']['display_name']}](benches/{b['bench']}/RESULTS.md)" for b in retired)]
     return "\n".join(out) + "\n"
 
@@ -230,7 +242,7 @@ def render():
             "Generated by `scripts/summarize.py` after each merge; do not edit by hand. Recipes ranked by score. "
             "Smoke runs (fewer attempts than the benchmark defines) are noisy. Score = mean reward over all trials; "
             "a trial that errors or times out scores 0. `err` = trial raised an exception (timeout, context "
-            "overflow, infrastructure).", "", *(section[1:] if section else ["_No results yet._", ""])])
+            "overflow, infrastructure).", "", *(section[2:] if section else ["_No results yet._", ""])])
         # bench_section links from the repo root; this file sits two levels down.
         text = files[bench_dir / "RESULTS.md"]
         for prefix in ("recipes/", "runs/"):

@@ -1,6 +1,7 @@
 id = "deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark"
 role = "local"                     # a recipe you can run at home
 model_family = "DeepSeek-V4.1-Flash-1017"
+anchor = true                      # runs every benchmark, so ratings stay comparable across them
 display_name = "DeepSeek-V4.1-Flash · TensorFold TP2"
 weights = "EXL3 2.9bpw"             # short, for the leaderboard
 hardware = "2× DGX Spark"

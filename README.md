@@ -6,14 +6,15 @@ how much a recipe gives up, or doesn't.
 
 ## Leaderboard
 
-One row per recipe and one column per benchmark. *Overall* is the mean over all benchmarks, shown once a recipe has run on every one of them. Recipe names
-link to the recipe (exact weights, engine, flags, hardware), and scores link to the run's per-task stats.
-Rows marked *API reference* are official APIs. Each benchmark header links to its per-task results and
-agent behaviour (tokens, tool calls, parse errors, cut-off replies). The table is rebuilt automatically
-after every merge.
+One row per recipe, one score column per current benchmark, ranked by **Rating**: an Elo-scale
+rating fitted on every trial of every benchmark, retired ones included, so recipes that ran only some
+benchmarks still rank fairly against the rest. *Coverage* is how many current tasks a recipe has run;
+fewer tasks means a wider interval. Recipe names link to the recipe (exact weights, engine, flags,
+hardware), scores to the run's per-task stats, and benchmark headers to per-task results and agent
+behaviour. *API reference* rows are official APIs; *anchor* recipes run every benchmark to keep ratings
+comparable across them. The table is rebuilt automatically after every merge.
 
 <!-- leaderboard:start -->
-_No results yet._
 <!-- leaderboard:end -->
 
 ## Benchmarks

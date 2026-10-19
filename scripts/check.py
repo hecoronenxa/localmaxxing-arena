@@ -10,7 +10,8 @@ A run passes when its bench.toml copy is identical to benches/<bench>/bench.toml
 frozen), its recipe still exists with the same id, model and api_base, its harbor-config.json is exactly
 what scripts/run.py generates from them, it ran on the bench's Harbor version, every trial used the
 pinned task content, trials.jsonl covers every task `attempts` times, the evidence archive is recorded,
-and the leaderboard renders. Generated files are not checked: the publish workflow rebuilds them on main.
+and the leaderboard renders. Every leaderboard column after the first also needs full runs from at
+least two anchor recipes. Generated files are not checked: the publish workflow rebuilds them on main.
 """
 import importlib.util, json, sys, tomllib
 from pathlib import Path
@@ -88,8 +89,28 @@ def main():
         for e in errs:
             print(f"     - {e}")
         failed |= bool(errs)
+    failed |= not check_anchors()
     load("summarize").render()  # generated files are rebuilt after merge; here only prove the data renders
     sys.exit(1 if failed else 0)
+
+
+def check_anchors(minimum=2):
+    """Every leaderboard column after the first needs full runs from >= minimum anchor recipes, so its
+    task difficulties are tied to the rating scale the other benches already set."""
+    columns = tomllib.loads((ROOT / "leaderboard.toml").read_text())["columns"]
+    ok = True
+    for bench in columns[1:]:
+        anchors = set()
+        for run_json in (ROOT / "runs" / bench).glob("*/run.json"):
+            meta = json.loads(run_json.read_text())
+            recipe = ROOT / meta["recipe_file"]
+            if (not meta.get("smoke") and meta.get("finished") and recipe.exists()
+                    and tomllib.loads(recipe.read_text()).get("anchor")):
+                anchors.add(meta["recipe_file"])
+        if len(anchors) < minimum:
+            print(f"FAIL leaderboard.toml lists {bench}, which has {len(anchors)} anchor full runs (needs {minimum})")
+            ok = False
+    return ok
 
 
 if __name__ == "__main__":

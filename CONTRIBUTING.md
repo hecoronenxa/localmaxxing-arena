@@ -11,6 +11,7 @@ One file per endpoint in [recipes/](recipes/), named `<model>@<recipe>.toml`. Co
 |---|---|
 | `role` | `local`, or `reference` for an official API (tagged *API reference* on the leaderboard) |
 | `model_family` | ties a recipe to its API reference, e.g. `DeepSeek-V4.1-Flash-1017` |
+| `anchor` | `true` for the few recipes committed to running every benchmark (see below) |
 | `display_name` | leaderboard name: model · engine, e.g. `DeepSeek-V4.1-Flash · TensorFold TP2` |
 | `weights`, `hardware` | short leaderboard labels, e.g. `EXL3 2.9bpw`, `2× DGX Spark` |
 | `weights_detail`, `serving`, `hardware_detail` | enough to rebuild it: repo @ revision, quant, engine @ commit, flags that matter |
@@ -77,15 +78,35 @@ runs it from scratch. Scores are never carried over, not even for tasks that loo
 different harness, agent setting or task digest changes what a score means. CI enforces this: a run's
 copy of `bench.toml` must equal the current file, and every trial's task digest must match the pin.
 
-The README leaderboard shows the benchmarks listed in [leaderboard.toml](leaderboard.toml), one column
-each.
+The README leaderboard shows the benchmarks listed in [leaderboard.toml](leaderboard.toml), one
+score column each.
 
-- **Replace a benchmark:** add the new one, run the recipes worth keeping on it, then swap it for the
-  old id in `leaderboard.toml`. Until then both columns can show.
-- **Add a benchmark:** add `benches/<bench>/` (README + `bench.toml`) and list it in `leaderboard.toml`.
-  *Overall* then needs a result on it too.
-- **Retire a benchmark:** remove it from `leaderboard.toml`. Its runs stay in the repo and its
-  `benches/<bench>/RESULTS.md` keeps updating; the README lists it under the table as retired.
+- **Replace a benchmark:** add the new one and get the anchor runs on it (below), then swap it for the
+  old id in `leaderboard.toml`.
+- **Add a benchmark:** add `benches/<bench>/` (README + `bench.toml`), run the anchors, list it in
+  `leaderboard.toml`.
+- **Retire a benchmark:** remove it from `leaderboard.toml`. Its column goes away, but its runs stay in
+  the repo, its `benches/<bench>/RESULTS.md` keeps updating, and its trials still count in the rating.
+
+## Rating and anchors
+
+Recipes are ranked by a rating fitted by [scripts/rating.py](scripts/rating.py): P(pass) =
+logistic(skill[recipe] − difficulty[bench, task]), fitted jointly on every trial of every benchmark
+(retired included), shown on the Elo scale (1000 + 174 × skill; +100 ≈ 64% vs 36% odds on the same
+task). Each task has its own difficulty, so a recipe is credited for how hard the tasks it ran were,
+and a legacy recipe that never ran a newer benchmark keeps a fair rating without reruns. The fit is
+redone from scratch on every merge, so ratings drift a little as data arrives; per-benchmark scores
+don't.
+
+The rating can compare two benchmarks only through recipes that ran both. **Anchors** provide that
+link: a few recipes marked `anchor = true` run every benchmark in full. A benchmark can join
+`leaderboard.toml` (after the first) only once **at least two anchors** have full runs on it, and CI
+enforces this. Keep a pinned-weights local recipe among the anchors, since an official API can change
+or disappear. Current anchors: the DeepSeek-V4.1-Flash official API and the local EXL3 2.9bpw recipe.
+
+The rating assumes one overall skill. A recipe that is strong on one benchmark and weak on another is
+averaged, and the per-benchmark columns show the split; read partial coverage together with the
+interval.
 
 ## Layout
 
@@ -98,6 +119,7 @@ recipes/<model>@<recipe>.toml      one endpoint per file
 scripts/run.py                     bench + recipe -> Harbor job -> runs/ + evidence/
 scripts/collect.py                 evidence/ -> runs/<bench>/<run>/trials.jsonl; --pack archives evidence
 scripts/summarize.py               runs/ -> README leaderboard, benches/*/RESULTS.md, STATS.md (CI, after merge)
+scripts/rating.py                  the rating fit (Rasch / Bradley-Terry, no dependencies)
 scripts/check.py                   PR validation (CI)
 .github/workflows/                 check.yml on PRs, publish.yml after merge
 runs/<bench>/<date>_<recipe>[_k<n>]/      in git

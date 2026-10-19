@@ -1,6 +1,7 @@
 id = "deepseek-v4.1-flash@deepseek-api"
 role = "reference"                 # official API: the bar local recipes are measured against
 model_family = "DeepSeek-V4.1-Flash-1017"
+anchor = true                      # runs every benchmark, so ratings stay comparable across them
 display_name = "DeepSeek-V4.1-Flash · official API"
 weights = "official"               # short, for the leaderboard
 hardware = "DeepSeek API"
