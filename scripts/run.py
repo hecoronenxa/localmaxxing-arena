@@ -182,6 +182,10 @@ def main():
         }
     if args.resume:
         part = meta["parts"][-1]
+        if part.pop("evidence", None) and not args.dry_run:  # the evidence changes: collect.py --pack re-archives it
+            for old in (ROOT / "evidence" / args.bench).glob(f"{part['job_name']}.*gz"):
+                old.unlink()
+            (run_dir / "run.json").write_text(json.dumps(meta, indent=2) + "\n")
     else:
         part = {"job_name": run_dir.name, "attempts": attempts, "n_concurrent": n_concurrent,
                 "config": f"{bench['runner']}-config-p1.json", "started_at": now, "host": meta["host"]}
