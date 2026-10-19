@@ -74,7 +74,7 @@ BEHAVIOUR = [
     ("LLM share of agent time", lambda t: fmt(total(t, "llm_s") / total(t, "agent_s") if total(t, "agent_s") else None, "{:.0%}")),
     ("Agent min", lambda t: fmt(mean(t, "agent_s") and mean(t, "agent_s") / 60, "{:.1f}")),
     ("Parse err", lambda t: str(total(t, "parse_errors"))),
-    ("At reply cap", lambda t: str(total(t, "calls_at_reply_cap"))),
+    ("Over reply cap", lambda t: str(total(t, "replies_over_cap"))),
     ("Summarized", lambda t: str(total(t, "summarizations"))),
     ("No task_complete", lambda t: str(sum(1 for r in t if not r.get("task_complete_calls")))),
 ]
@@ -82,7 +82,7 @@ BEHAVIOUR_NOTE = (
     "Per-trial averages unless noted. *Reasoning tok (est)* splits output tokens by the character share of "
     "reasoning vs visible output (Harbor does not keep the provider's reasoning-token count). *Max prompt / "
     "Max reply* = largest single LLM call. *Out tok/s* = output tokens / time inside LLM calls (includes "
-    "prefill and queueing). *Parse err*, *At reply cap* (call hit `max_tokens`), *Summarized* (context "
+    "prefill and queueing). *Parse err*, *Over reply cap* (reply cut at `max_tokens`; the actions in it were not run), *Summarized* (context "
     "summarizations) and *No task_complete* (trial ended without the agent declaring completion) are totals.")
 
 

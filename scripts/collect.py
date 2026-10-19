@@ -28,6 +28,7 @@ def seconds(span):
 
 PARSE_ERROR = "Previous response had parsing errors"
 TRUNCATED = "ERROR!! NONE of the actions you just requested were performed"
+OVER_CAP = "hit max_tokens limit"
 
 
 def call_stats(agent_dir, reply_cap):
@@ -89,6 +90,10 @@ def trial_row(trial_dir, reply_cap):
         "started_at": r.get("started_at"),
     }
     row.update(call_stats(trial_dir / "agent", reply_cap))
+    # Replies cut at max_tokens that Terminus-2 could not salvage never become trajectory steps; the
+    # trial log is the only record of them.
+    log = trial_dir / "trial.log"
+    row["replies_over_cap"] = log.read_text(errors="replace").count(OVER_CAP) if log.exists() else None
     if row.get("reasoning_share") is not None and row["output_tokens"]:
         row["reasoning_tokens_est"] = round(row["output_tokens"] * row["reasoning_share"])
     if row["llm_s"] and row["output_tokens"]:
