@@ -1,0 +1,63 @@
+{
+  "bench": "bfcl-100",
+  "recipe_file": "recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.toml",
+  "recipe": {
+    "id": "deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark",
+    "role": "local",
+    "model_family": "DeepSeek-V4.1-Flash-1017",
+    "anchor": true,
+    "display_name": "DeepSeek-V4.1-Flash \u00b7 TensorFold TP2",
+    "weights": "EXL3 2.9bpw",
+    "hardware": "2\u00d7 DGX Spark",
+    "weights_detail": "LibertAIDAI/DeepSeek-V4.1-Flash-1017-EXL3-2.9bpw @ afc7aa0a + official Engram shards @ 1bae0e10",
+    "serving": "bertholomus/TensorFold deepseek-v41-tp2 @ 8e0966e (TP2) + image-limit patch layer; recipe lucataco/DeepSeek-V4.1-Flash-2x-DGX-Spark @ 7b46f9d; CONTEXT=1048576 PARALLEL=4 MTP_DRAFTS=5",
+    "hardware_detail": "2\u00d7 NVIDIA DGX Spark (GB10, 128 GB), CX7 RoCE, GPU clocks locked 0-2200 MHz",
+    "model": "openai/deepseek-v4.1-flash",
+    "api_base": "http://192.168.0.112:8888/v1",
+    "n_concurrent": 4
+  },
+  "attempts": 1,
+  "finished": true,
+  "runner": "inspect",
+  "harness": "inspect-ai==0.3.281 + inspect_evals[bfcl] @ git+https://github.com/UKGovernmentBEIS/inspect_evals@8ef810f09930362302fc59b10a382d96dd767171 + openai==3.35.1",
+  "host": {
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "node": "macmini.local",
+    "docker": {
+      "ServerVersion": "",
+      "NCPU": 0,
+      "MemTotal": 0,
+      "Architecture": ""
+    }
+  },
+  "started_at": "2026-10-19T12:57:21+00:00",
+  "parts": [
+    {
+      "job_name": "2026-10-19_deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark",
+      "attempts": 1,
+      "n_concurrent": 4,
+      "config": "inspect-config-p1.json",
+      "started_at": "2026-10-19T12:57:21+00:00",
+      "host": {
+        "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "machine": "arm64",
+        "node": "macmini.local",
+        "docker": {
+          "ServerVersion": "",
+          "NCPU": 0,
+          "MemTotal": 0,
+          "Architecture": ""
+        }
+      },
+      "finished": true,
+      "evidence": {
+        "archive": "2026-10-19_deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.tar.gz",
+        "bytes": 9238954,
+        "sha256": "9dfe69f9c166014d9b2134c68c7605d908b1ab9aee6adf50d3a974346f472379",
+        "pieces": [],
+        "url": null
+      }
+    }
+  ]
+}
