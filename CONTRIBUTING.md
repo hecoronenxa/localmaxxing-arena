@@ -63,6 +63,23 @@ uv run scripts/collect.py runs/<bench>/<run>                   # refresh raw met
 anything else: no edits to `benches/`, no other flags. When Harbor finishes, `run.py` extracts the raw
 metrics and packs the evidence automatically.
 
+## 2b. Measure speed (optional, recommended)
+
+```bash
+uv run scripts/speed.py recipes/<id>.toml    # writes speed/<recipe id>/<date>.json
+```
+
+It sends a ~32,768-token prose prompt and streams 512 tokens, single stream, three times, each with a
+fresh random prefix so nothing comes from the prefix cache, and records the medians:
+
+- **pp** (prompt processing, prefill) = prompt tokens / time to first token, network latency included
+- **tg** (token generation, decode) = generated tokens / time from first to last token; reasoning tokens count
+
+Run it while the endpoint serves nothing else, from a host on the same network as the server if you
+can. The leaderboard shows each recipe's average over its speed records as *PP 32K* and *TG 32K*. Speed
+records are small JSON files committed directly with the PR, no evidence needed; CI checks that the
+recipe still matches and the settings and medians are intact.
+
 ## 3. What gets committed, and what doesn't
 
 The repo keeps **raw metrics** only. `runs/<bench>/<run>/` holds:
@@ -80,18 +97,20 @@ logs), never goes into git. It sits in `evidence/<bench>/<run>/` (git-ignored) a
 is also split into `<run>.part01.gz`, `<run>.part02.gz`, … so it fits GitHub's 25 MB attachment limit
 (`cat <run>.part*.gz > <run>.tar.gz` restores it). Evidence travels with the pull request (below).
 
+Speed records `speed/<recipe id>/<date>.json` are committed as they are.
+
 The leaderboard in README.md, `benches/<bench>/RESULTS.md` and the recipe pages
 `benches/<bench>/recipes/<id>.md` are **generated after every merge**; don't commit them.
 
 ## 4. Open the pull request
 
-A PR may carry one run or several, for one recipe or more.
+A PR may carry one run or several, for one recipe or more, and speed records.
 
 ```bash
 uv run scripts/check.py                          # the same checks CI runs
 uv run scripts/summarize.py                      # optional preview; don't commit its output
 git checkout -b run/<bench>/<recipe id>
-git add runs/<bench>/<run>/ [recipes/<id>.toml]  # the recipe file only if it is new
+git add runs/<bench>/<run>/ [speed/<id>/<date>.json] [recipes/<id>.toml]  # recipe only if new
 git commit -m "<bench>: <recipe id> (k=N)" && git push
 ```
 
@@ -156,11 +175,13 @@ benches/<bench>/recipes/<id>.md      generated: one recipe's runs, pooled per-ta
 leaderboard.toml                     benches shown as README leaderboard columns
 recipes/<model>@<recipe>.toml        one endpoint per file
 runs/<bench>/<date>_<recipe>[_<n>]/  one run: run.json, recipe.toml, bench.toml, harbor-config-p1.json, trials.jsonl
+speed/<recipe id>/<date>[_<n>].json  one speed measurement (pp / tg at 32K context)
 evidence/<bench>/<run>/ + .tar.gz    git-ignored; attached to the PR
 scripts/run.py                       bench + recipe -> Harbor job -> runs/ + evidence/
 scripts/collect.py                   evidence/ -> trials.jsonl; --pack archives (and splits) the evidence
 scripts/summarize.py                 runs/ -> README leaderboard, RESULTS.md, recipe pages (CI, after merge)
 scripts/rating.py                    the rating fit (Rasch / Bradley-Terry, no dependencies)
+scripts/speed.py                     pp / tg speed at 32K context -> speed/
 scripts/check.py                     PR validation (CI)
 .github/workflows/                   check.yml on PRs, publish.yml after merge
 ```

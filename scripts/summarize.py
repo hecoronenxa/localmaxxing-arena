@@ -228,6 +228,10 @@ def readme_board(boards, retired):
         ratings = rating.fit((e["recipe_file"], (b["bench"], t["task"]), t["reward"])
                              for b in everything for e in b["entries"] for t in e["trials"])
         active_tasks = {(b["bench"], t) for b in boards for t in b["spec"]["suite"]["tasks"]}
+        speed = {}
+        for f in ROOT.glob("speed/*/*.json"):
+            rec = json.loads(f.read_text())
+            speed.setdefault(rec["recipe_file"], []).append(rec)
         rows = []
         for f, e in recipes.items():
             mine = [(b, x) for b in everything for x in b["entries"] if x["recipe_file"] == f]
@@ -241,15 +245,18 @@ def readme_board(boards, retired):
                 x = next((x for x in b["entries"] if x["recipe_file"] == f), None)
                 cells.append(f"[{pct(x)}]({x['page']}){flag(x, b['spec']['suite']['n_attempts'])}" if x else "-")
             efforts = ", ".join(sorted({b["spec"]["agent"]["reasoning_effort"] for b, _ in mine}))
-            rows.append((ratings.get(f), e, cells, efforts, coverage))
+            recs = speed.get(f, [])
+            pp = f"{statistics.fmean(r['pp_tok_s'] for r in recs):,.0f}" if recs else "-"
+            tg = f"{statistics.fmean(r['tg_tok_s'] for r in recs):,.1f}" if recs else "-"
+            rows.append((ratings.get(f), e, cells, efforts, coverage, pp, tg))
         rows.sort(key=lambda x: (x[0] is None, -(x[0] or (0, 0))[0], x[1]["recipe"]["display_name"]))
-        out = ["| Recipe | Weights | Reasoning | Hardware | "
+        out = ["| Recipe | Weights | Reasoning | Hardware | PP 32K (tok/s) | TG 32K (tok/s) | "
                + "".join(f"[{b['spec']['display_name']}](benches/{b['bench']}/RESULTS.md) | " for b in boards)
-               + "Rating (95% CI) | Coverage |", "|---|---|---|---|" + "---|" * len(boards) + "---|---|"]
-        for rated, e, cells, efforts, coverage in rows:
+               + "Rating (95% CI) | Coverage |", "|---|---|---|---|---|---|" + "---|" * len(boards) + "---|---|"]
+        for rated, e, cells, efforts, coverage, pp, tg in rows:
             r = e["recipe"]
             rating_cell = f"**{rated[0]:.0f}** ({rated[0] - rated[1]:.0f}–{rated[0] + rated[1]:.0f})" if rated else "-"
-            out.append(f"| {name_cell(e, 'README.md')} | {r.get('weights', '-')} | {efforts} | {r.get('hardware', '-')} | "
+            out.append(f"| {name_cell(e, 'README.md')} | {r.get('weights', '-')} | {efforts} | {r.get('hardware', '-')} | {pp} | {tg} | "
                        + "".join(f"{c} | " for c in cells) + f"{rating_cell} | {coverage} |")
     if retired:
         out += ["", "Retired benchmarks (no column, still in the rating): "

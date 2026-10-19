@@ -12,7 +12,9 @@ benchmarks still rank fairly against the rest. *Coverage* is how many current ta
 fewer tasks means a wider interval. Each score pools every run of that recipe; *k=1/3* flags a score
 from fewer attempts than the benchmark defines. Recipe names link to the recipe (exact weights, engine, flags,
 hardware), scores to the recipe's per-task stats and runs, and benchmark headers to per-task results and agent
-behaviour. *API reference* rows are official APIs; *anchor* recipes run every benchmark to keep ratings
+behaviour. *PP 32K* / *TG 32K* are single-stream prefill and decode speeds at a 32K-token context (tok/s,
+averaged over the recipe's speed measurements), so you can see how fast a recipe feels on its hardware.
+*API reference* rows are official APIs; *anchor* recipes run every benchmark to keep ratings
 comparable across them. The table is rebuilt automatically after every merge.
 
 <!-- leaderboard:start -->

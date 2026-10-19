@@ -11,9 +11,9 @@ frozen), its recipe still exists with the same id, model and api_base, each part
 exactly what scripts/run.py generates from them, it ran on the bench's Harbor version, every trial used the
 pinned task content, trials.jsonl covers every task `attempts` times, every part is finished with its evidence archive recorded,
 and the leaderboard renders. Every leaderboard column after the first also needs full runs from at
-least two anchor recipes. Generated files are not checked: the publish workflow rebuilds them on main.
+least two anchor recipes. Speed records (speed/<recipe id>/*.json) are validated too. Generated files are not checked: the publish workflow rebuilds them on main.
 """
-import importlib.util, json, sys, tomllib
+import importlib.util, json, statistics, sys, tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -92,8 +92,40 @@ def main():
             print(f"     - {e}")
         failed |= bool(errs)
     failed |= not check_anchors()
+    failed |= not check_speed()
     load("summarize").render()  # generated files are rebuilt after merge; here only prove the data renders
     sys.exit(1 if failed else 0)
+
+
+def check_speed():
+    """speed/<recipe id>/*.json from scripts/speed.py: recipe still matches, settings and medians intact."""
+    ok = True
+    for f in sorted(ROOT.glob("speed/*/*.json")):
+        rec, errs = json.loads(f.read_text()), []
+        recipe_file = ROOT / rec.get("recipe_file", "")
+        if not recipe_file.is_file():
+            errs.append(f"{rec.get('recipe_file')} missing")
+        else:
+            recipe = tomllib.loads(recipe_file.read_text())
+            if any(rec["recipe"].get(k) != recipe.get(k) for k in ("id", "model", "api_base")):
+                errs.append("recipe id / model / api_base changed since the measurement")
+            if f.parent.name != recipe["id"]:
+                errs.append(f"stored under speed/{f.parent.name}/, recipe id is {recipe['id']}")
+        if (rec.get("context_tokens"), rec.get("generate_tokens"), rec.get("concurrency")) != (32768, 512, 1):
+            errs.append("not measured with scripts/speed.py settings (32768 context, 512 generated, 1 stream)")
+        samples = rec.get("samples") or []
+        if len(samples) < 3:
+            errs.append(f"{len(samples)} samples, needs 3")
+        if any(not 0.9 * 32768 <= s["prompt_tokens"] <= 1.1 * 32768 for s in samples):
+            errs.append("a sample's prompt is not within 10% of 32,768 tokens")
+        if samples and (rec.get("pp_tok_s") != statistics.median(s["pp_tok_s"] for s in samples)
+                        or rec.get("tg_tok_s") != statistics.median(s["tg_tok_s"] for s in samples if s["tg_tok_s"] is not None)):
+            errs.append("pp_tok_s / tg_tok_s are not the medians of the samples")
+        print(f"{'FAIL' if errs else 'ok  '} {f.relative_to(ROOT)}")
+        for e in errs:
+            print(f"     - {e}")
+        ok &= not errs
+    return ok
 
 
 def check_anchors(minimum=2):

@@ -9,6 +9,7 @@
 | | | | | <!-- attachment link(s) --> | <!-- shasum -a 256 evidence/<bench>/<run>.tar.gz --> |
 
 - New recipe file? <!-- yes: recipes/<id>.toml / no -->
+- Speed record? <!-- speed/<id>/<date>.json: pp ... tok/s, tg ... tok/s / none -->
 
 ## Evidence
 
@@ -22,7 +23,8 @@ split) to this description or a comment. Its sha256 must match `evidence.sha256`
 - [ ] The endpoint served the recipe exactly as its file describes (weights revision, engine commit, flags, hardware)
 - [ ] New recipe: a new `id`, with `weights_detail`, `serving` and `hardware_detail` complete enough to rebuild it
 - [ ] `uv run scripts/check.py` passes locally
-- [ ] Only raw data committed (`runs/<bench>/<run>/`, plus the recipe file if new); no README, RESULTS.md or recipe pages
+- [ ] Only raw data committed (`runs/<bench>/<run>/`, speed records, the recipe file if new); no README, RESULTS.md or recipe pages
+- [ ] Speed (if included) was measured with `scripts/speed.py` while the endpoint served nothing else
 - [ ] Evidence attached for every run
 - [ ] Anything unusual (server restarts, errors, retries, other load on the endpoint) is described below
 
