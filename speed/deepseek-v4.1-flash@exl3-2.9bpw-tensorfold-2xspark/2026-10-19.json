@@ -1,0 +1,44 @@
+{
+  "recipe_file": "recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.toml",
+  "recipe": {
+    "id": "deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark",
+    "model": "openai/deepseek-v4.1-flash",
+    "api_base": "http://192.168.0.112:8888/v1"
+  },
+  "date": "2026-10-19T09:10:20+00:00",
+  "context_tokens": 32768,
+  "generate_tokens": 512,
+  "concurrency": 1,
+  "host": {
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64"
+  },
+  "samples": [
+    {
+      "prompt_tokens": 31786,
+      "ttft_s": 30.105,
+      "pp_tok_s": 1055.8,
+      "completion_tokens": 512,
+      "decode_s": 8.743,
+      "tg_tok_s": 58.4
+    },
+    {
+      "prompt_tokens": 31782,
+      "ttft_s": 29.441,
+      "pp_tok_s": 1079.5,
+      "completion_tokens": 512,
+      "decode_s": 9.474,
+      "tg_tok_s": 53.9
+    },
+    {
+      "prompt_tokens": 31794,
+      "ttft_s": 32.557,
+      "pp_tok_s": 976.6,
+      "completion_tokens": 512,
+      "decode_s": 8.496,
+      "tg_tok_s": 60.1
+    }
+  ],
+  "pp_tok_s": 1055.8,
+  "tg_tok_s": 58.4
+}
