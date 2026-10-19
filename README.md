@@ -19,7 +19,9 @@ They are shown for information only and don't affect the Rating or the ranking.
 comparable across them. The table is rebuilt automatically after every merge.
 
 <!-- leaderboard:start -->
-_No results yet._
+| Recipe | Weights | Reasoning | Hardware | PP 32K (tok/s) | TG 32K (tok/s) | [BFCL-100](benches/bfcl-100/RESULTS.md) | Rating (95% CI) | Coverage |
+|---|---|---|---|---|---|---|---|---|
+| [DeepSeek-V4.1-Flash · TensorFold TP2](recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.toml) *(anchor)* | EXL3 2.9bpw | low | 2× DGX Spark | 1,056 | 58.4 | [68.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.md) | **1149** (1044–1254) | 100/100 |
 <!-- leaderboard:end -->
 
 ## Benchmarks
