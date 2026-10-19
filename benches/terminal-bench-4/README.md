@@ -2,7 +2,7 @@
 
 [Terminal-Bench](https://github.com/harbor-framework/terminal-bench) 4.0.0 (2026-08-26, 66 tasks): agentic work in a terminal, run with [Harbor](https://github.com/harbor-framework/harbor). We use a 10-task subset that needs no GPU and covers cryptanalysis, linguistics, music theory, geometry, appsec, chemistry, aviation, CAD and build tooling.
 
-## Protocol v1 ([protocol-v1.toml](protocol-v1.toml))
+## Settings ([bench.toml](bench.toml))
 
 | | |
 |---|---|

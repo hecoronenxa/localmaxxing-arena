@@ -109,7 +109,7 @@ def main():
     run_dir = args.run_dir.resolve()
     meta = json.loads((run_dir / "run.json").read_text())
     ev = ROOT / "evidence" / meta["bench"] / meta["job_name"]
-    reply_cap = tomllib.loads((run_dir / "protocol.toml").read_text())["agent"]["max_output_tokens"]
+    reply_cap = tomllib.loads((run_dir / "bench.toml").read_text())["agent"]["max_output_tokens"]
     rows = [row for f in sorted(ev.glob("jobs/*/*/result.json")) if (row := trial_row(f.parent, reply_cap))]
     (run_dir / "trials.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     job = next(ev.glob("jobs/*/result.json"), None)

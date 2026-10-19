@@ -1,8 +1,8 @@
-<!-- One PR per run. Title: "<bench>: <recipe id> (protocol vN, k=N)" -->
+<!-- One PR per run. Title: "<bench>: <recipe id> (k=N)" -->
 
 ## Run
 
-- Bench / protocol:
+- Bench:
 - Recipe: `recipes/<id>.toml` (new / existing)
 - Score:
 - Run dir: `runs/<bench>/<run>/`

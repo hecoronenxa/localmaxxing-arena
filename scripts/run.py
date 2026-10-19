@@ -2,20 +2,20 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Run one recipe on one benchmark under that benchmark's protocol.
+"""Run one recipe on one benchmark (benches/<bench>/bench.toml).
 
-    uv run scripts/run.py terminal-bench-4 recipes/<id>.toml                 # full run (protocol n_attempts)
+    uv run scripts/run.py terminal-bench-4 recipes/<id>.toml                 # full run (bench n_attempts)
     uv run scripts/run.py terminal-bench-4 recipes/<id>.toml --attempts 1    # smoke run
     uv run scripts/run.py terminal-bench-4 recipes/<id>.toml --resume runs/terminal-bench-4/<dir>
 
-The protocol is the newest benches/<bench>/protocol-v*.toml unless --protocol is given. Two places:
+Two places:
 
-    runs/<bench>/<run>/       in git: run.json (what ran: protocol, recipe, host, versions),
-                              recipe.toml, protocol.toml, harbor-config.json, trials.jsonl (raw metrics)
+    runs/<bench>/<run>/       in git: run.json (what ran: bench, recipe, host, versions),
+                              recipe.toml, bench.toml, harbor-config.json, trials.jsonl (raw metrics)
     evidence/<bench>/<run>/   git-ignored: Harbor job output (trajectories, recordings, verifier logs)
                               and harbor.log; packed to <run>.tar.gz with its sha256 in run.json
 
-<run> = <date>_<protocol>_<recipe id>[_k<attempts>]. When Harbor exits, scripts/collect.py --pack
+<run> = <date>_<recipe id>[_k<attempts>]. When Harbor exits, scripts/collect.py --pack
 extracts trials.jsonl and archives the evidence. The API key is read from the recipe's api_key_env and
 passed only through the process environment.
 """
@@ -25,8 +25,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def harbor_config(protocol, model, attempts, n_concurrent, job_name, jobs_dir):
-    agent, suite, job = protocol["agent"], protocol["suite"], protocol["job"]
+def harbor_config(bench, model, attempts, n_concurrent, job_name, jobs_dir):
+    agent, suite, job = bench["agent"], bench["suite"], bench["job"]
     price = model.get("pricing", {})
     model_info = {
         "max_input_tokens": agent["max_input_tokens"],
@@ -84,24 +84,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("bench", help="directory name under benches/, e.g. terminal-bench-4")
     ap.add_argument("model", type=Path, help="recipes/<id>.toml")
-    ap.add_argument("--protocol", type=Path, help="default: newest benches/<bench>/protocol-v*.toml")
-    ap.add_argument("--attempts", type=int, help="override protocol n_attempts (smoke runs)")
+    ap.add_argument("--attempts", type=int, help="override the bench's n_attempts (smoke runs)")
     ap.add_argument("--n-concurrent", type=int, help="override the recipe's n_concurrent (host limits)")
     ap.add_argument("--resume", type=Path, help="existing run dir to resume")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    if args.protocol is None:
-        found = sorted((ROOT / "benches" / args.bench).glob("protocol-v*.toml"),
-                       key=lambda f: int(f.stem.removeprefix("protocol-v")))
-        if not found:
-            sys.exit(f"no protocol in benches/{args.bench}/")
-        args.protocol = found[-1]
-    protocol = tomllib.loads(args.protocol.read_text())
-    if protocol["bench"] != args.bench or protocol["runner"] != "harbor":
-        sys.exit(f"{args.protocol} is bench {protocol['bench']!r}, runner {protocol['runner']!r}")
+    bench_file = ROOT / "benches" / args.bench / "bench.toml"
+    if not bench_file.exists():
+        sys.exit(f"no {bench_file.relative_to(ROOT)}")
+    bench = tomllib.loads(bench_file.read_text())
+    if bench["id"] != args.bench or bench["runner"] != "harbor":
+        sys.exit(f"{bench_file} is bench {bench['id']!r}, runner {bench['runner']!r}")
     model = tomllib.loads(args.model.read_text())
-    attempts = args.attempts or protocol["suite"]["n_attempts"]
+    attempts = args.attempts or bench["suite"]["n_attempts"]
     n_concurrent = args.n_concurrent or model["n_concurrent"]
 
     if args.resume:
@@ -113,14 +109,14 @@ def main():
         job_name = meta["job_name"]
     else:
         date = datetime.date.today().isoformat()
-        suffix = "" if attempts == protocol["suite"]["n_attempts"] else f"_k{attempts}"
-        job_name = f"{date}_{protocol['name']}_{model['id']}{suffix}"
+        suffix = "" if attempts == bench["suite"]["n_attempts"] else f"_k{attempts}"
+        job_name = f"{date}_{model['id']}{suffix}"
         run_dir = ROOT / "runs" / args.bench / job_name
         if run_dir.exists():
             sys.exit(f"{run_dir} exists; pass --resume {run_dir} to continue it")
 
     ev_dir = Path("evidence") / args.bench / job_name  # relative to ROOT, the cwd Harbor runs in
-    cfg = harbor_config(protocol, model, attempts, n_concurrent, job_name, ev_dir / "jobs")
+    cfg = harbor_config(bench, model, attempts, n_concurrent, job_name, ev_dir / "jobs")
     if args.dry_run:
         print(json.dumps(cfg, indent=2))
         return
@@ -132,12 +128,10 @@ def main():
         meta = {
             "job_name": job_name,
             "bench": args.bench,
-            "protocol": protocol["name"],
-            "protocol_file": str(args.protocol.resolve().relative_to(ROOT)),
             "recipe_file": str(args.model.resolve().relative_to(ROOT)),
             "recipe": {k: v for k, v in model.items() if k != "api_key_env"},
             "attempts": attempts,
-            "smoke": attempts != protocol["suite"]["n_attempts"],
+            "smoke": attempts != bench["suite"]["n_attempts"],
             "n_concurrent": n_concurrent,
             "harbor": harbor_version(),
             "host": host_info(),
@@ -145,7 +139,7 @@ def main():
         }
         (run_dir / "run.json").write_text(json.dumps(meta, indent=2) + "\n")
         shutil.copy(args.model, run_dir / "recipe.toml")
-        shutil.copy(args.protocol, run_dir / "protocol.toml")
+        shutil.copy(bench_file, run_dir / "bench.toml")
 
     env = dict(os.environ)
     key_env = model.get("api_key_env") or ""

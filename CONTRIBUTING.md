@@ -1,7 +1,7 @@
 # Contributing
 
 Every result lands through a pull request, one run per PR, ours included. A run is one recipe on one
-bench under that bench's current protocol.
+benchmark.
 
 ## 1. Write a recipe
 
@@ -9,7 +9,7 @@ One file per endpoint in [recipes/](recipes/), named `<model>@<recipe>.toml`. Co
 
 | Field | |
 |---|---|
-| `role` | `local` (competes) or `reference` (official API, a reference line) |
+| `role` | `local`, or `reference` for an official API (tagged *API reference* on the leaderboard) |
 | `model_family` | ties a recipe to its API reference, e.g. `DeepSeek-V4.1-Flash-1017` |
 | `display_name` | leaderboard name: model · engine, e.g. `DeepSeek-V4.1-Flash · TensorFold TP2` |
 | `weights`, `hardware` | short leaderboard labels, e.g. `EXL3 2.9bpw`, `2× DGX Spark` |
@@ -24,7 +24,7 @@ README lists its own tools.
 
 ```bash
 uv run scripts/run.py <bench> recipes/<id>.toml --attempts 1   # smoke
-uv run scripts/run.py <bench> recipes/<id>.toml                # full, protocol attempts
+uv run scripts/run.py <bench> recipes/<id>.toml                # full: the bench's attempts
 uv run scripts/run.py <bench> recipes/<id>.toml --resume runs/<bench>/<run dir>
 uv run scripts/collect.py runs/<bench>/<run dir>               # refresh raw metrics mid-run
 uv run scripts/summarize.py                                    # rebuild leaderboard, RESULTS.md, STATS.md
@@ -56,36 +56,44 @@ git add recipes/<id>.toml runs/<bench>/<run>/ README.md RESULTS.md
 ```
 
 Open the PR (the template asks for the score and the evidence), then attach
-`evidence/<bench>/<run>.tar.gz` to the description or a comment. CI runs `check.py`: the protocol and
-recipe copies match the repo, the Harbor config is exactly what `run.py` generates, every task ran
+`evidence/<bench>/<run>.tar.gz` to the description or a comment. CI runs `check.py`: the benchmark is
+unchanged, the recipe still matches, the Harbor config is exactly what `run.py` generates, every task ran
 `attempts` times, the evidence archive is recorded, and generated files are fresh. Reviewers compare the
 attached archive's sha256 with `run.json` and spot-check trajectories.
 
-## Benchmarks and protocols
+## Benchmarks are frozen
 
-The README leaderboard has one column per active benchmark, showing results under that benchmark's
-latest protocol.
+A benchmark is everything in `benches/<bench>/bench.toml`: upstream dataset and version, the task list
+with each task's content digest, harness and agent settings, context budget, attempts. Once it has
+results it never changes. Any change (new upstream version, tasks added, removed or edited, different
+agent settings) makes a **new benchmark** with a new id, e.g. `terminal-bench-4-r2`, and every recipe
+runs it from scratch. Scores are never carried over, not even for tasks that look identical, because a
+different harness, agent setting or task digest changes what a score means. CI enforces this: a run's
+copy of `bench.toml` must equal the current file, and every trial's task digest must match the pin.
 
-- **Change a benchmark's settings:** add `protocol-v<N+1>.toml`; never edit one that has results. The
-  column switches to v<N+1>, and recipes reappear in it once rerun. Older results stay in RESULTS.md.
-- **Add a benchmark:** add `benches/<bench>/` with a README and `protocol-v1.toml`; it becomes a new
-  column. *Overall* then needs a result on it too.
-- **Drop a benchmark:** set `retired = true` in its latest protocol. The column goes away; its results
-  stay in RESULTS.md.
+The README leaderboard shows the benchmarks listed in [leaderboard.toml](leaderboard.toml), one column
+each.
+
+- **Replace a benchmark:** add the new one, run the recipes worth keeping on it, then swap it for the
+  old id in `leaderboard.toml`. Until then both columns can show.
+- **Add a benchmark:** add `benches/<bench>/` (README + `bench.toml`) and list it in `leaderboard.toml`.
+  *Overall* then needs a result on it too.
+- **Drop a benchmark:** remove it from `leaderboard.toml`. Its results stay in RESULTS.md.
 
 ## Layout
 
 ```
 benches/<bench>/README.md          what the bench tests, tasks, how to run
-benches/<bench>/protocol-v<N>.toml fixed settings (suite, agent, context, attempts)
+benches/<bench>/bench.toml         frozen definition (suite + task digests, agent, context, attempts)
+leaderboard.toml                   benches shown as README leaderboard columns
 recipes/<model>@<recipe>.toml      one endpoint per file
-scripts/run.py                     bench protocol + recipe -> Harbor job -> runs/ + evidence/
+scripts/run.py                     bench + recipe -> Harbor job -> runs/ + evidence/
 scripts/collect.py                 evidence/ -> runs/<bench>/<run>/trials.jsonl; --pack archives evidence
 scripts/summarize.py               runs/ -> README leaderboard, RESULTS.md, runs/<bench>/<run>/STATS.md
 scripts/check.py                   PR validation (CI)
-runs/<bench>/<date>_<protocol>_<recipe>[_k<n>]/      in git
-  run.json                         what ran: protocol, recipe, Harbor version, runner host, evidence sha256
-  recipe.toml, protocol.toml       copies as of the run
+runs/<bench>/<date>_<recipe>[_k<n>]/      in git
+  run.json                         what ran: bench, recipe, Harbor version, runner host, evidence sha256
+  recipe.toml, bench.toml          copies as of the run
   harbor-config.json               generated Harbor config (no secrets)
   trials.jsonl                     raw metrics, one trial per line
   STATS.md                         generated per-task breakdown
