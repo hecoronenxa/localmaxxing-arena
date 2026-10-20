@@ -56,7 +56,7 @@ body:
       label: Endpoint requirements
       description: Leave as is unless the benchmark changes.
       value: |
-        - OpenAI-compatible `/v1/chat/completions`, reachable from the runner host
+        - OpenAI-compatible `/v1/chat/completions`, `/v1/responses` or Anthropic `/v1/messages` (say which), reachable from the runner host
         - Accepts `reasoning_effort: max`, `temperature: 1.0` and `max_tokens: 131072` on every request
         - Context of 131,072 prompt + 131,072 reply tokens per parallel stream; set `n_concurrent` to the number of streams that fit
         - A single request can run up to 3 hours (max-effort replies on a slow server); nothing in between may cut it

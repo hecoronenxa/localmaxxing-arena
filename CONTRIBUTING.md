@@ -27,13 +27,15 @@ describes. To benchmark something new, copy an existing file to `recipes/<model>
 | Field | |
 |---|---|
 | `id` | the file name without `.toml`; never reused for a different setup |
-| `role` | `local`, or `reference` for an official API (tagged *API reference* on the leaderboard) |
+| `role` | `local`, `reference` for an official API (tagged *API reference*), or `proxy` for an unofficial reverse proxy over a subscription (tagged *subscription proxy*) |
 | `model_family` | ties a recipe to its API reference, e.g. `DeepSeek-V4.1-Flash-1017` |
 | `anchor` | `true` only for the few recipes committed to running every benchmark (see below) |
 | `display_name` | leaderboard name: model · engine, e.g. `DeepSeek-V4.1-Flash · TensorFold TP2` |
 | `weights`, `hardware` | short leaderboard labels, e.g. `EXL3 2.9bpw`, `2× DGX Spark` |
 | `weights_detail`, `serving`, `hardware_detail` | enough for someone else to rebuild it: repo @ revision, quant, engine @ commit, launch flags, hardware |
 | `model`, `api_base`, `api_key_env` | any OpenAI-compatible endpoint: `model = "openai/<served name>"`; `api_key_env` names the environment variable holding the key (empty for none) |
+| `protocol` | optional: `chat` (default, OpenAI `/v1/chat/completions`), `responses` (OpenAI `/v1/responses`) or `anthropic` (`/v1/messages`). `api_base` stays the `/v1` URL; for `anthropic` the runner strips `/v1`. Same benchmark, different inspect provider: `responses` sets `responses_store=true`, `anthropic` adds the `anthropic` package and inspect sends no `temperature`, so scores across protocols are not strictly like-for-like. Changing it later needs a new recipe id |
+| `strict_tools` | optional, default `true`. With `protocol = "chat"` inspect marks every tool `"strict": true`: local engines ignore it, but OpenAI's API then rejects BFCL's optional parameters (400). Set `false` for OpenAI-hosted models; it adds `-M strict_tools=false`. Only valid for `chat`; changing it later needs a new recipe id |
 | `n_concurrent` | parallel trials; no more than the server's parallel streams |
 | `[pricing]` | optional, USD per 1M tokens (`input`, `cached_input`, `output`) for cost columns |
 
