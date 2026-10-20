@@ -22,9 +22,10 @@ benchmark to keep ratings comparable across them. The table is rebuilt automatic
 <!-- leaderboard:start -->
 | Recipe | Weights | Reasoning | Hardware | PP 32K (tok/s) | TG 32K (tok/s) | [BFCL-100](benches/bfcl-100/RESULTS.md) | Rating (95% CI) | Coverage |
 |---|---|---|---|---|---|---|---|---|
-| [DeepSeek-V4.1-Flash · TensorFold TP2](recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.toml) *(anchor)* | EXL3 2.9bpw | low | 2× DGX Spark | 1,056 | 58.4 | [68.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.md) | **1167** (1058–1276) | 100/100 |
-| [DeepSeek-V4.1-Flash · Mia EAQ · TensorFold Zig TP2](recipes/deepseek-v4.1-flash@exl3-eaq-2.9bpw-tensorfold-zig-2xspark.toml) | EXL3 EAQ 2.9bpw | low | 2× DGX Spark | 1,759 | 58.5 | [67.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-eaq-2.9bpw-tensorfold-zig-2xspark.md) | **1156** (1047–1264) | 100/100 |
-| [GLM-5.3-Flash · Mia EXL3 · TensorFold TP2](recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml) | EXL3 4bpw | low | 2× DGX Spark | 1,655 | 49.2 | [55.0%](benches/bfcl-100/recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.md) | **1031** (926–1135) | 100/100 |
+| [DeepSeek-V4.1-Flash · TensorFold TP2](recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.toml) *(anchor)* | EXL3 2.9bpw | low | 2× DGX Spark | 1,056 | 58.4 | [68.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-2.9bpw-tensorfold-2xspark.md) | **1174** (1065–1283) | 100/100 |
+| [DeepSeek-V4.1-Flash · Mia EAQ · TensorFold Zig TP2](recipes/deepseek-v4.1-flash@exl3-eaq-2.9bpw-tensorfold-zig-2xspark.toml) | EXL3 EAQ 2.9bpw | low | 2× DGX Spark | 1,759 | 58.5 | [67.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-eaq-2.9bpw-tensorfold-zig-2xspark.md) | **1163** (1054–1272) | 100/100 |
+| [GLM-5.3-Flash · Mia EXL3 · TensorFold TP2](recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml) | EXL3 4bpw | low | 2× DGX Spark | 1,655 | 49.2 | [55.0%](benches/bfcl-100/recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.md) | **1036** (930–1141) | 100/100 |
+| [GPT-6-Astra · Codex subscription proxy](recipes/gpt-6-astra@codex-proxy.toml) *(subscription proxy)* | cloud (Codex) | low | Codex OAuth proxy | - | - | [52.0%](benches/bfcl-100/recipes/gpt-6-astra@codex-proxy.md) | **1005** (900–1110) | 100/100 |
 <!-- leaderboard:end -->
 
 ## Benchmarks
