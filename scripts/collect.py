@@ -58,7 +58,7 @@ def call_stats(agent_dir, reply_cap):
         "empty_reasoning_calls": sum(1 for s in calls if not s.get("reasoning_content")),
         "max_prompt_tokens": max(m(s, "prompt_tokens") for s in calls),
         "max_output_tokens": max(m(s, "completion_tokens") for s in calls),
-        "calls_at_reply_cap": sum(1 for s in calls if m(s, "completion_tokens") >= reply_cap - 1),
+        "calls_at_reply_cap": sum(1 for s in calls if m(s, "completion_tokens") >= reply_cap - 1) if reply_cap else None,
         "parse_errors": feedback.count(PARSE_ERROR),
         "truncated_replies": feedback.count(TRUNCATED),
     }
@@ -74,7 +74,7 @@ def trial_row(trial_dir, reply_cap):
     row = {
         "trial": r["trial_name"],
         "task": r["task_name"].split("/")[-1],
-        "task_ref": (r.get("task_id") or {}).get("ref"),
+        "task_ref": (r.get("task_id") or {}).get("ref") or (f"sha256:{r['task_checksum']}" if r.get("task_checksum") else None),
         "reward": float(((r.get("verifier_result") or {}).get("rewards") or {}).get("reward") or 0.0),
         "exception": (r.get("exception_info") or {}).get("exception_type"),
         "input_tokens": ar.get("n_input_tokens"),
@@ -211,7 +211,7 @@ def main():
     run_dir = args.run_dir.resolve()
     meta = json.loads((run_dir / "run.json").read_text())
     spec = tomllib.loads((run_dir / "bench.toml").read_text())
-    reply_cap = spec["agent"]["max_output_tokens"]
+    reply_cap = spec["agent"].get("max_output_tokens")  # pi/codex have no reply cap
     runner = spec.get("runner", "harbor")
     digest = bench_digest(meta["bench"]) if runner == "inspect" else None
     old = [json.loads(line) for line in (run_dir / "trials.jsonl").read_text().splitlines() if line.strip()] \

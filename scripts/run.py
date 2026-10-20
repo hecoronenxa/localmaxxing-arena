@@ -29,17 +29,56 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def agent_for(bench, model):
+    """Scaffold for a recipe's provider: bench.toml [agent.by_provider] overrides the default name."""
+    agent = bench["agent"]
+    provider = model.get("provider", "local")
+    if provider not in PROVIDERS:
+        sys.exit(f"recipe {model.get('id')!r}: provider {provider!r} is not one of {PROVIDERS}")
+    prefix = {"openai": "openai/", "anthropic": "anthropic/"}.get(provider)
+    if prefix and not model["model"].startswith(prefix):
+        sys.exit(f"recipe {model.get('id')!r}: provider {provider!r} needs model = \"{prefix}<name>\" "
+                 f"(got {model['model']!r}); Harbor routes other prefixes through a gateway")
+    return (agent.get("by_provider") or {}).get(provider, agent["name"])
+
+
 def harbor_config(bench, model, attempts, n_concurrent, job_name, jobs_dir):
     agent, suite, job = bench["agent"], bench["suite"], bench["job"]
     price = model.get("pricing", {})
+    agent_name = agent_for(bench, model)
     model_info = {
-        "max_input_tokens": agent["max_input_tokens"],
-        "max_output_tokens": agent["max_output_tokens"],
+        "max_input_tokens": agent.get("max_input_tokens", 131072),
+        "max_output_tokens": agent.get("max_output_tokens", 131072),
         "litellm_provider": "openai",
         "mode": "chat",
         "input_cost_per_token": price.get("input", 0) / 1e6,
         "output_cost_per_token": price.get("output", 0) / 1e6,
         "cache_read_input_token_cost": price.get("cached_input", price.get("input", 0)) / 1e6,
+    }
+    kwargs = {}
+    version = (agent.get("versions") or {}).get(agent_name)
+    if version:
+        kwargs["version"] = version
+    if agent_name == "pi":
+        # pi reads its endpoint from OPENAI_BASE_URL (set in main) and has no token/timeout kwargs.
+        kwargs["model_api"] = agent.get("model_api", "openai-completions")
+        kwargs["thinking"] = agent["reasoning_effort"]
+    elif agent_name in ("codex", "claude-code"):
+        kwargs["reasoning_effort"] = agent["reasoning_effort"]
+    else:
+        # LiteLLM-based agents (terminus-2, swe-agent, ...): pass the connection and caps explicitly.
+        kwargs.update({
+            "api_base": model["api_base"],
+            "reasoning_effort": agent["reasoning_effort"],
+            "temperature": agent["temperature"],
+            "model_info": model_info,
+            "llm_kwargs": {"max_tokens": agent["max_output_tokens"],
+                           "timeout": agent["request_timeout_sec"]},
+        })
+    dataset = {"path": suite["path"]} if suite.get("path") else {
+        "name": suite["dataset"],
+        "version": suite["version"],
+        "task_names": [f"{suite['dataset'].split('/')[0]}/{t}" for t in suite["tasks"]],
     }
     return {
         "job_name": job_name,
@@ -47,23 +86,15 @@ def harbor_config(bench, model, attempts, n_concurrent, job_name, jobs_dir):
         "n_attempts": attempts,
         "n_concurrent_trials": n_concurrent,
         "timeout_multiplier": job["timeout_multiplier"],
+        "agent_timeout_multiplier": job.get("agent_timeout_multiplier", 1.0),
+        "verifier_timeout_multiplier": job.get("verifier_timeout_multiplier", 1.0),
         "retry": {"max_retries": job["max_retries"]},
         "environment": {"type": job["environment"]},
-        "datasets": [{
-            "name": suite["dataset"],
-            "version": suite["version"],
-            "task_names": [f"{suite['dataset'].split('/')[0]}/{t}" for t in suite["tasks"]],
-        }],
+        "datasets": [dataset],
         "agents": [{
-            "name": agent["name"],
+            "name": agent_name,
             "model_name": model["model"],
-            "kwargs": {
-                "api_base": model["api_base"],
-                "reasoning_effort": agent["reasoning_effort"],
-                "temperature": agent["temperature"],
-                "model_info": model_info,
-                "llm_kwargs": {"max_tokens": agent["max_output_tokens"], "timeout": agent["request_timeout_sec"]},
-            },
+            "kwargs": kwargs,
         }],
     }
 
@@ -72,6 +103,8 @@ def harbor_config(bench, model, attempts, n_concurrent, job_name, jobs_dir):
 # same for all three; only the inspect provider differs. bench.toml is untouched, and "chat" generates exactly
 # the command earlier runs used, so existing results stay valid.
 PROTOCOLS = ("chat", "responses", "anthropic")
+# Recipe `provider` -> scaffold, mapped in bench.toml [agent.by_provider].
+PROVIDERS = ("local", "openai", "anthropic")
 ANTHROPIC_REQUIREMENT = "anthropic==1.15.0"   # only added for protocol = "anthropic"; not in bench.toml's pins
 
 
@@ -183,6 +216,17 @@ def main():
     attempts = args.attempts or bench["suite"]["n_attempts"]
     n_concurrent = args.n_concurrent or model["n_concurrent"]
 
+    # Check credentials and bench-required variables before creating the run directory, so a missing one
+    # leaves no stub run behind.
+    env = dict(os.environ)
+    key_env = model.get("api_key_env") or ""
+    if key_env and not env.get(key_env):
+        sys.exit(f"{key_env} is not set")
+    if bench["runner"] == "harbor":
+        for name in bench["job"].get("required_env", []):
+            if not env.get(name):
+                sys.exit(f"{name} is not set; {args.bench} needs it (see benches/{args.bench}/README.md)")
+
     now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
     if args.resume:
         run_dir = args.resume.resolve()
@@ -239,13 +283,21 @@ def main():
         shutil.copy(args.model, run_dir / "recipe.toml")
         shutil.copy(bench_file, run_dir / "bench.toml")
 
-    env = dict(os.environ)
-    key_env = model.get("api_key_env") or ""
-    if key_env and not env.get(key_env):
-        sys.exit(f"{key_env} is not set")
     env["OPENAI_API_KEY"] = env[key_env] if key_env else "local"
-
     if bench["runner"] == "harbor":
+        agent_name = agent_for(bench, model)
+        if agent_name == "pi":
+            # pi resolves its endpoint from OPENAI_BASE_URL.
+            env["OPENAI_BASE_URL"] = model["api_base"]
+        elif agent_name == "codex":
+            # A subscription login (CODEX_FORCE_AUTH_JSON) must keep Codex's own backend; only an
+            # API-key recipe gets an explicit base URL.
+            if key_env:
+                env["OPENAI_BASE_URL"] = model["api_base"]
+        elif agent_name == "claude-code":
+            env["ANTHROPIC_BASE_URL"] = model["api_base"].removesuffix("/").removesuffix("/v1")
+            if key_env:
+                env["ANTHROPIC_API_KEY"] = env[key_env]
         cmd = ["harbor", "job", "resume", "-p", str(ev_dir / "jobs" / job_name)] if args.resume else \
               ["harbor", "run", "-c", str(run_dir / part["config"]), "-y", "-q"]
     else:

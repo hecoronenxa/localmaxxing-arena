@@ -33,6 +33,7 @@ benchmark to keep ratings comparable across them. The table is rebuilt automatic
 | Bench | What it measures | Definition | Results |
 |---|---|---|---|
 | [bfcl-100](benches/bfcl-100/) | Multi-turn tool use: 100 BFCL v3 multi-turn tasks (base, missing function, missing parameter, long context), low reasoning | [bench.toml](benches/bfcl-100/bench.toml) | [RESULTS.md](benches/bfcl-100/RESULTS.md) |
+| [scicode-10](benches/scicode-10/) | Scientific computing: the 10 hardest SciCode test problems (7–15 sequential sub-steps), fractional reward per sub-step | [bench.toml](benches/scicode-10/bench.toml) | no results yet |
 
 ## Contributing
 
