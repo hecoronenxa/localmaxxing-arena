@@ -1,0 +1,63 @@
+{
+  "bench": "bfcl-100",
+  "recipe_file": "recipes/gpt-6-astra@codex-proxy.toml",
+  "recipe": {
+    "id": "gpt-6-astra@codex-proxy",
+    "role": "proxy",
+    "model_family": "gpt-6-astra",
+    "anchor": false,
+    "display_name": "GPT-6-Astra · Codex subscription proxy",
+    "weights": "cloud (Codex)",
+    "hardware": "Codex OAuth proxy",
+    "weights_detail": "OpenAI GPT-6-Astra via a Codex-subscription OAuth reverse proxy; not the official API, and results may depend on the account/plan",
+    "serving": "OpenAI-compatible reverse proxy on 127.0.0.1:18318 in front of Codex OAuth",
+    "hardware_detail": "Cloud model; proxy/runner host: Windows 11 (AMD64, 16 cores)",
+    "model": "openai/gpt-6-astra",
+    "api_base": "http://127.0.0.1:18318/v1",
+    "n_concurrent": 1
+  },
+  "attempts": 1,
+  "finished": true,
+  "runner": "inspect",
+  "harness": "inspect-ai==0.3.281 + inspect_evals[bfcl] @ git+https://github.com/UKGovernmentBEIS/inspect_evals@8ef810f09930362302fc59b10a382d96dd767171 + openai==3.35.1",
+  "host": {
+    "os": "Windows-11-10.0.26300-SP0",
+    "machine": "AMD64",
+    "node": "PC_small",
+    "docker": {
+      "ServerVersion": "29.4.1",
+      "NCPU": 16,
+      "MemTotal": 33338609664,
+      "Architecture": "x86_64"
+    }
+  },
+  "started_at": "2026-10-20T02:35:13+00:00",
+  "parts": [
+    {
+      "job_name": "2026-10-20_gpt-6-astra@codex-proxy",
+      "attempts": 1,
+      "n_concurrent": 1,
+      "config": "inspect-config-p1.json",
+      "started_at": "2026-10-20T02:35:13+00:00",
+      "host": {
+        "os": "Windows-11-10.0.26300-SP0",
+        "machine": "AMD64",
+        "node": "PC_small",
+        "docker": {
+          "ServerVersion": "29.4.1",
+          "NCPU": 16,
+          "MemTotal": 33338609664,
+          "Architecture": "x86_64"
+        }
+      },
+      "finished": true,
+      "evidence": {
+        "archive": "2026-10-20_gpt-6-astra@codex-proxy.tar.gz",
+        "bytes": 4963217,
+        "sha256": "a1ad4ce4b89b0108a70d25f3a68a75b2df68d3947b64e5ea8b75440218ef41b5",
+        "pieces": [],
+        "url": null
+      }
+    }
+  ]
+}
