@@ -119,6 +119,12 @@ def inspect_config(bench, model, attempts, n_concurrent, job_name, log_dir):
     ]
     if proto == "responses":
         cmd += ["-M", "responses_api=true", "-M", "responses_store=true"]
+    if model.get("strict_tools", True) is False:
+        # inspect's openai-api provider marks every tool "strict": true. Local engines ignore that; OpenAI itself
+        # then rejects schemas with optional parameters (BFCL has many). Only the chat protocol sends it.
+        if proto != "chat":
+            sys.exit(f"recipe {model.get('id')!r}: strict_tools only applies to protocol = \"chat\"")
+        cmd += ["-M", "strict_tools=false"]
     return {"job_name": job_name, "log_dir": str(log_dir), "api_base": model["api_base"], "command": cmd}
 
 

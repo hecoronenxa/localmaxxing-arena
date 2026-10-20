@@ -50,6 +50,9 @@ def check_run(run_dir, run_py):
     if ran.get("protocol", "chat") != recipe.get("protocol", "chat"):
         errs.append(f"recipe protocol changed since the run ({ran.get('protocol', 'chat')!r} -> {recipe.get('protocol', 'chat')!r}); use a new recipe id")
 
+    if ran.get("strict_tools", True) != recipe.get("strict_tools", True):
+        errs.append(f"recipe strict_tools changed since the run ({ran.get('strict_tools', True)!r} -> {recipe.get('strict_tools', True)!r}); use a new recipe id")
+
     runner = spec.get("runner", "harbor")
     for part in meta["parts"]:
         config = run_dir / part["config"]
