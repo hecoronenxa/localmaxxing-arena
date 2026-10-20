@@ -47,6 +47,9 @@ def check_run(run_dir, run_py):
         if ran.get(key) != recipe.get(key):
             errs.append(f"recipe {key} changed since the run ({ran.get(key)!r} -> {recipe.get(key)!r}); use a new recipe id")
 
+    if ran.get("protocol", "chat") != recipe.get("protocol", "chat"):
+        errs.append(f"recipe protocol changed since the run ({ran.get('protocol', 'chat')!r} -> {recipe.get('protocol', 'chat')!r}); use a new recipe id")
+
     runner = spec.get("runner", "harbor")
     for part in meta["parts"]:
         config = run_dir / part["config"]
@@ -69,8 +72,8 @@ def check_run(run_dir, run_py):
     harness = meta.get("harness", meta.get("harbor", ""))
     if runner == "harbor" and spec["harbor_version"] not in harness:
         errs.append(f"ran on {harness!r}, bench requires Harbor {spec['harbor_version']}")
-    if runner == "inspect" and harness != run_py.harness_version(spec):
-        errs.append(f"ran on {harness!r}, bench requires {run_py.harness_version(spec)!r}")
+    if runner == "inspect" and harness != run_py.harness_version(spec, ran):
+        errs.append(f"ran on {harness!r}, bench requires {run_py.harness_version(spec, ran)!r}")
 
     rows = [json.loads(l) for l in (run_dir / "trials.jsonl").read_text().splitlines() if l.strip()] \
         if (run_dir / "trials.jsonl").exists() else []

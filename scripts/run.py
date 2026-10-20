@@ -68,6 +68,20 @@ def harbor_config(bench, model, attempts, n_concurrent, job_name, jobs_dir):
     }
 
 
+# Wire protocol a recipe's endpoint speaks (recipe field `protocol`, default "chat"). The benchmark itself is the
+# same for all three; only the inspect provider differs. bench.toml is untouched, and "chat" generates exactly
+# the command earlier runs used, so existing results stay valid.
+PROTOCOLS = ("chat", "responses", "anthropic")
+ANTHROPIC_REQUIREMENT = "anthropic==1.15.0"   # only added for protocol = "anthropic"; not in bench.toml's pins
+
+
+def protocol_of(model):
+    proto = model.get("protocol", "chat")
+    if proto not in PROTOCOLS:
+        sys.exit(f"recipe {model.get('id')!r}: protocol {proto!r} is not one of {PROTOCOLS}")
+    return proto
+
+
 def served_name(model):
     """Recipe model "openai/<served name>" (LiteLLM style) -> the name the endpoint serves."""
     return model["model"].split("/", 1)[1] if model["model"].startswith("openai/") else model["model"]
@@ -75,11 +89,15 @@ def served_name(model):
 
 def inspect_config(bench, model, attempts, n_concurrent, job_name, log_dir):
     """The inspect command (minus the API key), as data so check.py can regenerate and compare it.
-    The endpoint is inspect's generic OpenAI-compatible provider named "arena": ARENA_BASE_URL and
-    ARENA_API_KEY come from the environment."""
+    By recipe protocol: "chat" = inspect's generic OpenAI-compatible provider named "arena" (ARENA_BASE_URL,
+    ARENA_API_KEY from the environment); "responses" = inspect's openai provider on the Responses API
+    (OPENAI_BASE_URL, OPENAI_API_KEY; responses_store=true because servers may reject the encrypted-reasoning
+    `include` that inspect sends otherwise); "anthropic" = inspect's anthropic provider (ANTHROPIC_BASE_URL,
+    ANTHROPIC_API_KEY; `anthropic` added to the throwaway environment; inspect sends no temperature)."""
     harness, agent, suite = bench["harness"], bench["agent"], bench["suite"]
+    proto = protocol_of(model)
     cmd = ["uvx", "--python", harness["python"], "--from", harness["requirements"][0]]
-    for req in harness["requirements"][1:]:
+    for req in harness["requirements"][1:] + ([ANTHROPIC_REQUIREMENT] if proto == "anthropic" else []):
         cmd += ["--with", req]
     cmd += ["inspect", "eval", harness["task"]]
     for key, value in harness.get("task_args", {}).items():
@@ -87,7 +105,7 @@ def inspect_config(bench, model, attempts, n_concurrent, job_name, log_dir):
     cmd += [
         "--sample-id", ",".join(suite["tasks"]),
         "--epochs", str(attempts),
-        "--model", f"openai-api/arena/{served_name(model)}",
+        "--model", {"chat": "openai-api/arena/", "responses": "openai/", "anthropic": "anthropic/"}[proto] + served_name(model),
         "--reasoning-effort", agent["reasoning_effort"],
         "--temperature", str(agent["temperature"]),
         "--max-tokens", str(agent["max_output_tokens"]),
@@ -99,6 +117,8 @@ def inspect_config(bench, model, attempts, n_concurrent, job_name, log_dir):
         "--log-dir", str(log_dir),
         "--display", "plain",
     ]
+    if proto == "responses":
+        cmd += ["-M", "responses_api=true", "-M", "responses_store=true"]
     return {"job_name": job_name, "log_dir": str(log_dir), "api_base": model["api_base"], "command": cmd}
 
 
@@ -112,10 +132,13 @@ def inspect_missing(log_dir, tasks, attempts):
     return [t for t in tasks if any((t, e) not in done for e in range(1, attempts + 1))]
 
 
-def harness_version(bench):
+def harness_version(bench, model=None):
     if bench["runner"] == "harbor":
         return harbor_version()
-    return " + ".join(bench["harness"]["requirements"])
+    reqs = list(bench["harness"]["requirements"])
+    if model and protocol_of(model) == "anthropic":
+        reqs.append(ANTHROPIC_REQUIREMENT)
+    return " + ".join(reqs)
 
 
 def harbor_version():
@@ -175,7 +198,7 @@ def main():
             "attempts": attempts,
             "finished": False,
             "runner": bench["runner"],
-            "harness": harness_version(bench),
+            "harness": harness_version(bench, model),
             "host": host_info(),
             "started_at": now,
             "parts": [],
@@ -220,7 +243,14 @@ def main():
         cmd = ["harbor", "job", "resume", "-p", str(ev_dir / "jobs" / job_name)] if args.resume else \
               ["harbor", "run", "-c", str(run_dir / part["config"]), "-y", "-q"]
     else:
-        env["ARENA_BASE_URL"], env["ARENA_API_KEY"] = model["api_base"], env["OPENAI_API_KEY"]
+        proto = protocol_of(model)
+        if proto == "chat":
+            env["ARENA_BASE_URL"], env["ARENA_API_KEY"] = model["api_base"], env["OPENAI_API_KEY"]
+        elif proto == "responses":
+            env["OPENAI_BASE_URL"] = model["api_base"]
+        else:  # the Anthropic SDK appends /v1/messages itself, so the same api_base as the OpenAI routes works
+            env["ANTHROPIC_BASE_URL"] = model["api_base"].removesuffix("/").removesuffix("/v1")
+            env["ANTHROPIC_API_KEY"] = env["OPENAI_API_KEY"]
         cmd = cfg["command"]
         if args.resume:  # re-run only the tasks with no clean sample yet, into a new log next to the old ones
             missing = inspect_missing(ev_dir / "logs", bench["suite"]["tasks"], part["attempts"])
