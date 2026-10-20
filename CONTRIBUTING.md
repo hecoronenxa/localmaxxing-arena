@@ -27,7 +27,7 @@ describes. To benchmark something new, copy an existing file to `recipes/<model>
 | Field | |
 |---|---|
 | `id` | the file name without `.toml`; never reused for a different setup |
-| `role` | `local`, or `reference` for an official API (tagged *API reference* on the leaderboard) |
+| `role` | `local`, `reference` for an official API (tagged *API reference*), or `proxy` for an unofficial reverse proxy over a subscription (tagged *subscription proxy*) |
 | `model_family` | ties a recipe to its API reference, e.g. `DeepSeek-V4.1-Flash-1017` |
 | `anchor` | `true` only for the few recipes committed to running every benchmark (see below) |
 | `display_name` | leaderboard name: model · engine, e.g. `DeepSeek-V4.1-Flash · TensorFold TP2` |

@@ -199,7 +199,7 @@ def main():
             run_dir = ROOT / "runs" / args.bench / f"{base}_{n}"
         meta = {
             "bench": args.bench,
-            "recipe_file": str(args.model.resolve().relative_to(ROOT)),
+            "recipe_file": args.model.resolve().relative_to(ROOT).as_posix(),
             "recipe": {k: v for k, v in model.items() if k != "api_key_env"},
             "attempts": attempts,
             "finished": False,

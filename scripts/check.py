@@ -19,6 +19,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def repo_path(p):
+    """Run metadata records paths as the runner host saw them; Windows hosts use backslashes."""
+    return ROOT / Path(str(p).replace("\\", "/"))
+
+
 def load(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
     mod = importlib.util.module_from_spec(spec)
@@ -33,7 +38,7 @@ def check_run(run_dir, run_py):
     if meta.get("bench") != bench:
         errs.append(f"run.json bench {meta.get('bench')!r} but directory is runs/{bench}/")
     bench_src = ROOT / "benches" / bench / "bench.toml"
-    recipe_src = ROOT / meta["recipe_file"]
+    recipe_src = repo_path(meta["recipe_file"])
     if not bench_src.exists():
         return [f"{bench_src.relative_to(ROOT)} missing"]
     if (run_dir / "bench.toml").read_text() != bench_src.read_text():
@@ -58,11 +63,12 @@ def check_run(run_dir, run_py):
         config = run_dir / part["config"]
         cfg = json.loads(config.read_text()) if config.exists() else {}
         sub = "jobs" if runner == "harbor" else "logs"
-        out_dir = Path(cfg.get("jobs_dir" if runner == "harbor" else "log_dir", ""))  # absolute path on the runner host
+        raw_dir = cfg.get("jobs_dir" if runner == "harbor" else "log_dir", "")
+        out_dir = Path(str(raw_dir).replace("\\", "/"))  # absolute path on the runner host
         if out_dir.parts[-4:] != ("evidence", bench, part["job_name"], sub):
             errs.append(f"{part['config']}: output dir {str(out_dir)!r} is not .../evidence/{bench}/{part['job_name']}/{sub}")
         make = run_py.harbor_config if runner == "harbor" else run_py.inspect_config
-        expected = make(spec, ran, part["attempts"], part["n_concurrent"], part["job_name"], out_dir)
+        expected = make(spec, ran, part["attempts"], part["n_concurrent"], part["job_name"], Path(raw_dir))
         if cfg != expected:
             errs.append(f"{part['config']} is not what scripts/run.py generates from bench.toml and recipe.toml")
         ev = part.get("evidence") or {}
@@ -117,7 +123,7 @@ def check_speed():
     ok = True
     for f in sorted(ROOT.glob("speed/*/*.json")):
         rec, errs = json.loads(f.read_text()), []
-        recipe_file = ROOT / rec.get("recipe_file", "")
+        recipe_file = repo_path(rec.get("recipe_file", ""))
         if not recipe_file.is_file():
             errs.append(f"{rec.get('recipe_file')} missing")
         else:
@@ -153,9 +159,10 @@ def check_anchors(minimum=2):
         pooled = {}
         for run_json in (ROOT / "runs" / bench).glob("*/run.json"):
             meta = json.loads(run_json.read_text())
-            recipe = ROOT / meta["recipe_file"]
+            recipe = repo_path(meta["recipe_file"])
             if meta.get("finished") and recipe.exists() and tomllib.loads(recipe.read_text()).get("anchor"):
-                pooled[meta["recipe_file"]] = pooled.get(meta["recipe_file"], 0) + meta["attempts"]
+                key = recipe.relative_to(ROOT).as_posix()
+                pooled[key] = pooled.get(key, 0) + meta["attempts"]
         anchors = [f for f, k in pooled.items() if k >= need]
         if len(anchors) < minimum:
             print(f"FAIL leaderboard.toml lists {bench}, which has {len(anchors)} anchors at k>={need} (needs {minimum})")

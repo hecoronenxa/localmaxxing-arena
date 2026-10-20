@@ -15,8 +15,9 @@ hardware), scores to the recipe's per-task stats and runs, and benchmark headers
 behaviour. *PP 32K* / *TG 32K* are single-stream prefill and decode speeds at a 32K-token context (tok/s,
 averaged over the recipe's speed measurements), so you can see how fast a recipe feels on its hardware.
 They are shown for information only and don't affect the Rating or the ranking.
-*API reference* rows are official APIs; *anchor* recipes run every benchmark to keep ratings
-comparable across them. The table is rebuilt automatically after every merge.
+*API reference* rows are official APIs; *subscription proxy* rows are unofficial reverse proxies over a
+subscription (not an official API, and not reproducible from an API key); *anchor* recipes run every
+benchmark to keep ratings comparable across them. The table is rebuilt automatically after every merge.
 
 <!-- leaderboard:start -->
 | Recipe | Weights | Reasoning | Hardware | PP 32K (tok/s) | TG 32K (tok/s) | [BFCL-100](benches/bfcl-100/RESULTS.md) | Rating (95% CI) | Coverage |
