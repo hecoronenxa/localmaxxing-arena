@@ -26,6 +26,8 @@ benchmark to keep ratings comparable across them. The table is rebuilt automatic
 | [DeepSeek-V4.1-Flash · Mia EAQ · TensorFold Zig TP2](recipes/deepseek-v4.1-flash@exl3-eaq-2.9bpw-tensorfold-zig-2xspark.toml) | EXL3 EAQ 2.9bpw | low | 2× DGX Spark | 1,759 | 58.5 | [67.0%](benches/bfcl-100/recipes/deepseek-v4.1-flash@exl3-eaq-2.9bpw-tensorfold-zig-2xspark.md) | **1163** (1054–1272) | 100/100 |
 | [GLM-5.3-Flash · Mia EXL3 · TensorFold TP2](recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml) | EXL3 4bpw | low | 2× DGX Spark | 1,655 | 49.2 | [55.0%](benches/bfcl-100/recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.md) | **1036** (930–1141) | 100/100 |
 | [GPT-6-Astra · Codex subscription proxy](recipes/gpt-6-astra@codex-proxy.toml) *(subscription proxy)* | cloud (Codex) | low | Codex OAuth proxy | - | - | [52.0%](benches/bfcl-100/recipes/gpt-6-astra@codex-proxy.md) | **1005** (900–1110) | 100/100 |
+
+Retired benchmarks (no column, still in the rating): [SciCode-10](benches/scicode-10/RESULTS.md)
 <!-- leaderboard:end -->
 
 ## Benchmarks
