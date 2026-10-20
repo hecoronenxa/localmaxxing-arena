@@ -80,13 +80,18 @@ def harbor_config(bench, model, attempts, n_concurrent, job_name, jobs_dir):
         "version": suite["version"],
         "task_names": [f"{suite['dataset'].split('/')[0]}/{t}" for t in suite["tasks"]],
     }
+    # A recipe may override the bench's timeouts: a slow model or host needs more wall clock for the same
+    # task, which is an infrastructure limit, not a change to what is asked. n_concurrent is already per
+    # recipe (host/server capacity). The effective values are recorded in run.json and flagged on the board.
+    timeout = model.get("timeout_multiplier", job["timeout_multiplier"])
+    agent_timeout = model.get("agent_timeout_multiplier", job.get("agent_timeout_multiplier", 1.0))
     return {
         "job_name": job_name,
         "jobs_dir": str(jobs_dir),
         "n_attempts": attempts,
         "n_concurrent_trials": n_concurrent,
-        "timeout_multiplier": job["timeout_multiplier"],
-        "agent_timeout_multiplier": job.get("agent_timeout_multiplier", 1.0),
+        "timeout_multiplier": timeout,
+        "agent_timeout_multiplier": agent_timeout,
         "verifier_timeout_multiplier": job.get("verifier_timeout_multiplier", 1.0),
         "retry": {"max_retries": job["max_retries"]},
         "environment": {"type": job["environment"]},

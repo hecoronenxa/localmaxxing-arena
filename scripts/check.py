@@ -55,6 +55,10 @@ def check_run(run_dir, run_py):
     if ran.get("provider", "local") != recipe.get("provider", "local"):
         errs.append(f"recipe provider changed since the run ({ran.get('provider', 'local')!r} -> {recipe.get('provider', 'local')!r}); use a new recipe id")
 
+    for key in ("agent_timeout_multiplier", "timeout_multiplier"):
+        if ran.get(key) != recipe.get(key):
+            errs.append(f"recipe {key} changed since the run ({ran.get(key)!r} -> {recipe.get(key)!r}); use a new recipe id")
+
     if ran.get("protocol", "chat") != recipe.get("protocol", "chat"):
         errs.append(f"recipe protocol changed since the run ({ran.get('protocol', 'chat')!r} -> {recipe.get('protocol', 'chat')!r}); use a new recipe id")
 

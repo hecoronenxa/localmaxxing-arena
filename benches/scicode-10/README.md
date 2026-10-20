@@ -66,6 +66,10 @@ The bench is a single attempt per task (`n_attempts = 1`). The agent timeout in 
 `bench.toml` multiplies it by 6 (3 h) because a 14-step problem took 35 min with `pi`. The verifier gets
 60 min so one slow sub-step cannot consume the budget and turn a partial score into 0.
 
+A slower model or host may raise `agent_timeout_multiplier` in its recipe (and lower `n_concurrent` to fit
+the server): wall clock is an infrastructure limit, the task is unchanged. The recipe is then tagged
+*timeout override* on the leaderboard.
+
 A recipe for a local endpoint:
 
 ```toml

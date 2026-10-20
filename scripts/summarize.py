@@ -145,6 +145,8 @@ def link(target, page):
 def name_cell(entry, page):
     r = entry["recipe"]
     tags = ([ROLE_TAGS[r["role"]]] if r.get("role") in ROLE_TAGS else []) + (["anchor"] if r.get("anchor") else [])
+    if r.get("agent_timeout_multiplier") or r.get("timeout_multiplier"):
+        tags.append("timeout override")
     return f"[{r['display_name']}]({link(entry['recipe_file'], page)})" + (f" *({', '.join(tags)})*" if tags else "")
 
 
