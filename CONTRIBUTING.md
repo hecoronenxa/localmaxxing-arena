@@ -145,20 +145,28 @@ runs it from scratch. Scores are never carried over, not even for tasks that loo
 different harness, agent setting or task digest changes what a score means. CI enforces this: a run's
 copy of `bench.toml` must equal the current file, and every trial's task digest must match the pin.
 
-The README leaderboard shows the benchmarks listed in [leaderboard.toml](leaderboard.toml), one score
-column each.
+[leaderboard.toml](leaderboard.toml) gives every bench two independent switches:
+
+- `display = true` — a score column in the README leaderboard;
+- `rating = true` — its trials feed the joint rating.
+
+So a bench can have a column but no rating, a rating but no column (valid data, not shown as a column),
+or neither (it only has its `benches/<bench>/RESULTS.md`). Setting `display = false` for every bench
+leaves a README table ranked by Rating alone. Every bench must be listed; CI rejects a bench without an
+entry.
 
 - **Add a benchmark:** add `benches/<bench>/` (README + `bench.toml`), get the anchor runs on it (below),
-  then list it in `leaderboard.toml`.
-- **Replace a benchmark:** add the new one as above, then swap it for the old id in `leaderboard.toml`.
-- **Retire a benchmark:** remove it from `leaderboard.toml`. Its column goes away, but its runs stay in
-  the repo, its RESULTS.md keeps updating, and its trials still count in the rating.
+  then add `[benches.<bench>]` to `leaderboard.toml` (usually `display = true`, `rating = true`).
+- **Replace a benchmark:** add the new one as above, then set `display = false` for the old one.
+- **Retire a benchmark:** set `display = false` (keep `rating = true` if its data is still valid). Its
+  column goes away, but its runs stay in the repo, its RESULTS.md keeps updating, and its trials still
+  count in the rating. Set `rating = false` too when the bench itself is invalid (e.g. it leaked answers).
 
 ## Rating and anchors
 
 Recipes are ranked by a rating fitted by [scripts/rating.py](scripts/rating.py): P(pass) =
-logistic(skill[recipe] − difficulty[bench, task]), fitted jointly on every trial of every benchmark,
-retired ones included, and shown on the Elo scale (1000 + 174 × skill; +100 ≈ 64% vs 36% odds on the
+logistic(skill[recipe] − difficulty[bench, task]), fitted jointly on the trials of every benchmark with
+`rating = true`, and shown on the Elo scale (1000 + 174 × skill; +100 ≈ 64% vs 36% odds on the
 same task). Each task has its own difficulty, so a recipe is credited for how hard the tasks it ran
 were, and a legacy recipe that never ran a newer benchmark keeps a fair rating without reruns. The fit
 is redone from scratch on every merge, so ratings drift a little as data arrives; per-benchmark scores
@@ -183,7 +191,7 @@ benches/<bench>/select.py            inspect benches: reproduces the task list a
 benches/<bench>/bench.toml           frozen definition (suite + task digests, agent, context, result target)
 benches/<bench>/RESULTS.md           generated: per-task results and agent behaviour, all recipes
 benches/<bench>/recipes/<id>.md      generated: one recipe's runs, pooled per-task results and behaviour
-leaderboard.toml                     benches shown as README leaderboard columns
+leaderboard.toml                     per-bench display/rating switches
 recipes/<model>@<recipe>.toml        one endpoint per file
 runs/<bench>/<date>_<recipe>[_<n>]/  one run: run.json, recipe.toml, bench.toml, <runner>-config-p1.json, trials.jsonl
 speed/<recipe id>/<date>[_<n>].json  one speed measurement (pp / tg at 32K context)

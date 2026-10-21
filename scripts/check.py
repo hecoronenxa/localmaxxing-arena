@@ -119,6 +119,7 @@ def main():
         for e in errs:
             print(f"     - {e}")
         failed |= bool(errs)
+    failed |= not check_leaderboard()
     failed |= not check_anchors()
     failed |= not check_speed()
     load("summarize").render()  # generated files are rebuilt after merge; here only prove the data renders
@@ -156,10 +157,31 @@ def check_speed():
     return ok
 
 
+def check_leaderboard():
+    """Every bench has explicit display/rating switches, and every listed bench exists."""
+    entries = tomllib.loads((ROOT / "leaderboard.toml").read_text()).get("benches") or {}
+    ok = True
+    for bench_dir in sorted(d for d in (ROOT / "benches").glob("*") if (d / "bench.toml").exists()):
+        if bench_dir.name not in entries:
+            print(f"FAIL leaderboard.toml has no [benches.{bench_dir.name}] entry; set display/rating explicitly")
+            ok = False
+    for name, flags in entries.items():
+        if not (ROOT / "benches" / name / "bench.toml").exists():
+            print(f"FAIL leaderboard.toml lists {name}, which has no benches/{name}/bench.toml")
+            ok = False
+        for key in ("display", "rating"):
+            if not isinstance(flags.get(key), bool):
+                print(f"FAIL leaderboard.toml [benches.{name}] needs {key} = true or false")
+                ok = False
+    return ok
+
+
 def check_anchors(minimum=2):
     """Every leaderboard column after the first needs >= minimum anchor recipes whose finished runs pool
     to the bench's n_attempts, so its task difficulties are tied to the rating scale the other benches set."""
-    columns = tomllib.loads((ROOT / "leaderboard.toml").read_text())["columns"]
+    columns = [name for name, flags in
+               (tomllib.loads((ROOT / "leaderboard.toml").read_text()).get("benches") or {}).items()
+               if flags.get("display")]
     ok = True
     for bench in columns[1:]:
         need = tomllib.loads((ROOT / "benches" / bench / "bench.toml").read_text())["suite"]["n_attempts"]

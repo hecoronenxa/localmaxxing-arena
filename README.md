@@ -6,9 +6,10 @@ how much a recipe gives up, or doesn't.
 
 ## Leaderboard
 
-One row per recipe, one score column per current benchmark, ranked by **Rating**: an Elo-scale
-rating fitted on every trial of every benchmark, retired ones included, so recipes that ran only some
-benchmarks still rank fairly against the rest. *Coverage* is how many current tasks a recipe has run;
+One row per recipe, one score column per benchmark with `display = true` in
+[leaderboard.toml](leaderboard.toml), ranked by **Rating**: an Elo-scale rating fitted on the trials of
+every benchmark with `rating = true`, so recipes that ran only some benchmarks still rank fairly against
+the rest. *Coverage* is how many current tasks a recipe has run;
 fewer tasks means a wider interval. Each score pools every run of that recipe; *k=1/3* flags a score
 from fewer attempts than the benchmark defines. Recipe names link to the recipe (exact weights, engine, flags,
 hardware), scores to the recipe's per-task stats and runs, and benchmark headers to per-task results and agent
@@ -28,7 +29,7 @@ benchmark to keep ratings comparable across them. The table is rebuilt automatic
 | [GLM-5.3-Flash · Mia EXL3 · TensorFold TP2](recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml) | EXL3 4bpw | low | 2× DGX Spark | 1,655 | 49.2 | [55.0%](benches/bfcl-100/recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.md) | **1032** (926–1137) | 100/100 |
 | [GPT-6-Astra · Codex subscription proxy](recipes/gpt-6-astra@codex-proxy.toml) *(subscription proxy)* | cloud (Codex) | low | Codex OAuth proxy | - | - | [52.0%](benches/bfcl-100/recipes/gpt-6-astra@codex-proxy.md) | **1001** (895–1106) | 100/100 |
 
-Retired benchmarks (no column, still in the rating): [SciCode-10](benches/scicode-10/RESULTS.md)
+Not shown as a column: [SciCode-10](benches/scicode-10/RESULTS.md) (not rated)
 <!-- leaderboard:end -->
 
 ## Benchmarks

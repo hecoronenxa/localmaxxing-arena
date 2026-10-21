@@ -11,8 +11,8 @@ CI runs this after every merge to main and commits the output; contributors only
 
 All runs of a recipe on a bench are pooled: one score and k (summed attempts) per recipe per bench,
 flagged k=1/3 while below the bench's n_attempts. The README leaderboard has one score column per bench
-in leaderboard.toml and ranks recipes by a rating fitted on every trial of every bench, retired ones
-included (scripts/rating.py). Score = mean reward over all trials (TB convention: a trial that errors
+with `display = true` in leaderboard.toml and ranks recipes by a rating fitted on the trials of every
+bench with `rating = true` (scripts/rating.py); the two switches are independent. Score = mean reward over all trials (TB convention: a trial that errors
 or times out scores 0). The 95% interval is Wilson over trials, treating reward >= 1 as a pass.
 """
 import argparse, json, math, os, statistics, sys, tomllib
@@ -26,6 +26,13 @@ ROOT = Path(__file__).resolve().parent.parent
 # Leaderboard tag for a recipe role. "reference" is an official API; "proxy" is an unofficial
 # reverse proxy over a subscription, which is not the same thing and must not be shown as one.
 ROLE_TAGS = {"reference": "API reference", "proxy": "subscription proxy"}
+
+
+def bench_switches():
+    """{bench: (display, rating)} from leaderboard.toml; a bench absent from the file is shown nowhere."""
+    lb = tomllib.loads((ROOT / "leaderboard.toml").read_text())
+    return {name: (bool(f.get("display")), bool(f.get("rating")))
+            for name, f in (lb.get("benches") or {}).items()}
 
 
 def repo_path(p):
@@ -250,31 +257,46 @@ def bench_results(bench, spec, entries):
 BOARD_START, BOARD_END = "<!-- leaderboard:start -->", "<!-- leaderboard:end -->"
 
 
-def readme_board(boards, retired):
-    """One table: a pooled score column per bench in leaderboard.toml, plus a rating over every bench."""
-    everything = boards + retired
+def readme_board(boards, not_shown, rated):
+    """The README table: a pooled score column per displayed bench, plus a rating over the rated benches.
+
+    `boards` are the benches with display = true, `rated` the benches with rating = true, and `not_shown`
+    every bench without a column (listed in a footnote with its rating switch)."""
+    rated_names = {b["bench"] for b in rated}
+    benches = list({b["bench"]: b for b in [*boards, *rated]}.values())
     recipes = {}
-    for b in everything:
+    for b in benches:
         for e in b["entries"]:
             recipes[e["recipe_file"]] = e
     if not recipes:
         out = ["_No results yet._"]
     else:
         ratings = rating.fit((e["recipe_file"], (b["bench"], t["task"]), t["reward"])
-                             for b in everything for e in b["entries"] for t in e["trials"])
-        active_tasks = {(b["bench"], t) for b in boards for t in b["spec"]["suite"]["tasks"]}
+                             for b in rated for e in b["entries"] for t in e["trials"])
+        shown_tasks = {(b["bench"], t) for b in boards for t in b["spec"]["suite"]["tasks"]}
+        rated_tasks = {(b["bench"], t) for b in rated for t in b["spec"]["suite"]["tasks"]}
         speed = {}
         for f in ROOT.glob("speed/*/*.json"):
             rec = json.loads(f.read_text())
             speed.setdefault(repo_path(rec["recipe_file"]).relative_to(ROOT).as_posix(), []).append(rec)
         rows = []
         for f, e in recipes.items():
-            mine = [(b, x) for b in everything for x in b["entries"] if x["recipe_file"] == f]
+            mine = [(b, x) for b in benches for x in b["entries"] if x["recipe_file"] == f]
             covered = {(b["bench"], t["task"]) for b, x in mine for t in x["trials"]}
-            active = len(covered & active_tasks)
-            coverage = f"{active}/{len(active_tasks)}" if active else ("retired benches only" if covered else "-")
-            if active and len(covered) > active:
-                coverage += f" (+{len(covered) - active} retired)"
+            if shown_tasks:
+                # Coverage is over the benches shown as columns; rated-but-hidden tasks are noted.
+                active = len(covered & shown_tasks)
+                coverage = f"{active}/{len(shown_tasks)}" if active else ("hidden benches only" if covered else "-")
+                if active and len(covered) > active:
+                    coverage += f" (+{len(covered) - active} not shown)"
+            elif rated_tasks:
+                # No columns: coverage is over the rated benches.
+                active = len(covered & rated_tasks)
+                coverage = f"{active}/{len(rated_tasks)}" if active else ("unrated benches only" if covered else "-")
+                if active and len(covered) > active:
+                    coverage += f" (+{len(covered) - active} not rated)"
+            else:
+                coverage = "rated benches only" if covered else "-"
             cells = []
             for b in boards:
                 x = next((x for x in b["entries"] if x["recipe_file"] == f), None)
@@ -288,21 +310,23 @@ def readme_board(boards, retired):
         out = ["| Recipe | Weights | Reasoning | Hardware | PP 32K (tok/s) | TG 32K (tok/s) | "
                + "".join(f"[{b['spec']['display_name']}](benches/{b['bench']}/RESULTS.md) | " for b in boards)
                + "Rating (95% CI) | Coverage |", "|---|---|---|---|---|---|" + "---|" * len(boards) + "---|---|"]
-        for rated, e, cells, efforts, coverage, pp, tg in rows:
+        for rated_row, e, cells, efforts, coverage, pp, tg in rows:
             r = e["recipe"]
-            rating_cell = f"**{rated[0]:.0f}** ({rated[0] - rated[1]:.0f}–{rated[0] + rated[1]:.0f})" if rated else "-"
+            rating_cell = f"**{rated_row[0]:.0f}** ({rated_row[0] - rated_row[1]:.0f}–{rated_row[0] + rated_row[1]:.0f})" if rated_row else "-"
             out.append(f"| {name_cell(e, 'README.md')} | {r.get('weights', '-')} | {efforts} | {r.get('hardware', '-')} | {pp} | {tg} | "
                        + "".join(f"{c} | " for c in cells) + f"{rating_cell} | {coverage} |")
-    if retired:
-        out += ["", "Retired benchmarks (no column, still in the rating): "
-                + ", ".join(f"[{b['spec']['display_name']}](benches/{b['bench']}/RESULTS.md)" for b in retired)]
+    if not_shown:
+        out += ["", "Not shown as a column: " + ", ".join(
+            f"[{b['spec']['display_name']}](benches/{b['bench']}/RESULTS.md)"
+            + (" (rating)" if b["bench"] in rated_names else " (not rated)")
+            for b in not_shown)]
     return "\n".join(out) + "\n"
 
 
 def render():
     """Every generated file: {path: content}. README.md only has its leaderboard block replaced."""
     files = {}
-    columns = tomllib.loads((ROOT / "leaderboard.toml").read_text())["columns"]
+    switches = bench_switches()
     boards = {}
     for bench_dir in sorted(d for d in (ROOT / "benches").glob("*") if (d / "bench.toml").exists()):
         bench = bench_dir.name
@@ -313,11 +337,13 @@ def render():
         files[bench_dir / "RESULTS.md"] = bench_results(bench, spec, entries)
         for e in entries:
             files[ROOT / e["page"]] = recipe_page(bench, spec, e)
-    retired = [boards[b] for b in sorted(boards) if b not in columns]
+    displayed = [boards[b] for b in sorted(boards) if switches.get(b, (False, False))[0]]
+    rated = [boards[b] for b in sorted(boards) if switches.get(b, (False, False))[1]]
+    not_shown = [boards[b] for b in sorted(boards) if b not in {x["bench"] for x in displayed}]
     readme = (ROOT / "README.md").read_text()
     head, rest = readme.split(BOARD_START, 1)
     tail = rest.split(BOARD_END, 1)[1]
-    files[ROOT / "README.md"] = f"{head}{BOARD_START}\n{readme_board([boards[c] for c in columns], retired)}{BOARD_END}{tail}"
+    files[ROOT / "README.md"] = f"{head}{BOARD_START}\n{readme_board(displayed, not_shown, rated)}{BOARD_END}{tail}"
     return files
 
 

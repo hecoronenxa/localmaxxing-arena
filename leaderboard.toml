@@ -1,3 +1,11 @@
-# Benchmarks shown as README leaderboard columns, in order. Removing one drops its column (and from
-# Overall); its results stay in RESULTS.md. Adding one makes Overall require a result on it too.
-columns = ["bfcl-100"]
+# Per-bench switches, independent of each other:
+#   display = true -> a score column in the README leaderboard
+#   rating  = true -> its trials feed the joint rating (scripts/rating.py)
+# With both false the bench only has its benches/<id>/RESULTS.md. Every bench must be listed here.
+[benches.bfcl-100]
+display = true
+rating = true
+
+[benches.scicode-10]
+display = false
+rating = false       # open-book: the agent could read test_data.h5 (see scicode-10-v2)
