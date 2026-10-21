@@ -1,0 +1,62 @@
+{
+  "bench": "bfcl-100",
+  "recipe_file": "recipes/deepseek-v4.1-flash@official-fp8-fp4-vllm-tp8-8xgb10.toml",
+  "recipe": {
+    "id": "deepseek-v4.1-flash@official-fp8-fp4-vllm-tp8-8xgb10",
+    "role": "local",
+    "model_family": "DeepSeek-V4.1-Flash-1017",
+    "display_name": "DeepSeek-V4.1-Flash \u00b7 vLLM TP8",
+    "weights": "official FP8/FP4",
+    "hardware": "8\u00d7 GB10",
+    "weights_detail": "deepseek-ai/DeepSeek-V4.1-Flash-1017 official checkpoint (ModelScope, 48 shards, sha256 verified), unmodified",
+    "serving": "vLLM a34ca64c (vllm/vllm-openai:muse-spark-open-arm64-cu130) TP8 + dsv41 plugin pack 0.12.0 (arx RDMA all-reduce, SM120 DeepGEMM, sequence-parallel prefill, Marlin MXFP4 MoE); DSpark k=5, verify cap conf:0.1, relaxed accept topp:0.9,ratio:0.1; max-num-batched-tokens 8192",
+    "hardware_detail": "8\u00d7 GB10 (DGX Spark class, 128 GB), one 200G RoCE link each, default GPU clocks",
+    "model": "openai/deepseek-v4.1-flash",
+    "api_base": "http://192.168.88.1:8002/v1",
+    "n_concurrent": 8
+  },
+  "attempts": 1,
+  "finished": true,
+  "runner": "inspect",
+  "harness": "inspect-ai==0.3.281 + inspect_evals[bfcl] @ git+https://github.com/UKGovernmentBEIS/inspect_evals@8ef810f09930362302fc59b10a382d96dd767171 + openai==3.35.1",
+  "host": {
+    "os": "Linux-6.17.0-1029-nvidia-aarch64-with-glibc2.39",
+    "machine": "aarch64",
+    "node": "gx10-9701",
+    "docker": {
+      "ServerVersion": "29.2.1",
+      "NCPU": 20,
+      "MemTotal": 130595991552,
+      "Architecture": "aarch64"
+    }
+  },
+  "started_at": "2026-10-21T03:26:11+00:00",
+  "parts": [
+    {
+      "job_name": "2026-10-21_deepseek-v4.1-flash@official-fp8-fp4-vllm-tp8-8xgb10_3",
+      "attempts": 1,
+      "n_concurrent": 8,
+      "config": "inspect-config-p1.json",
+      "started_at": "2026-10-21T03:26:11+00:00",
+      "host": {
+        "os": "Linux-6.17.0-1029-nvidia-aarch64-with-glibc2.39",
+        "machine": "aarch64",
+        "node": "gx10-9701",
+        "docker": {
+          "ServerVersion": "29.2.1",
+          "NCPU": 20,
+          "MemTotal": 130595991552,
+          "Architecture": "aarch64"
+        }
+      },
+      "finished": true,
+      "evidence": {
+        "archive": "2026-10-21_deepseek-v4.1-flash@official-fp8-fp4-vllm-tp8-8xgb10_3.tar.gz",
+        "bytes": 6282815,
+        "sha256": "a42d69aaf19b40a6c70a76a6b714a39cad8faef02b2afb861f01fc68889b73a1",
+        "pieces": [],
+        "url": null
+      }
+    }
+  ]
+}
