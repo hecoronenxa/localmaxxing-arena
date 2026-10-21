@@ -1,0 +1,44 @@
+{
+  "recipe_file": "recipes/deepseek-v4.1-flash@official-fp8-fp4-vllm-tp8-8xgb10.toml",
+  "recipe": {
+    "id": "deepseek-v4.1-flash@official-fp8-fp4-vllm-tp8-8xgb10",
+    "model": "openai/deepseek-v4.1-flash",
+    "api_base": "http://192.168.88.1:8002/v1"
+  },
+  "date": "2026-10-20T19:42:51+00:00",
+  "context_tokens": 32768,
+  "generate_tokens": 512,
+  "concurrency": 1,
+  "host": {
+    "os": "Linux-6.17.0-1029-nvidia-aarch64-with-glibc2.39",
+    "machine": "aarch64"
+  },
+  "samples": [
+    {
+      "prompt_tokens": 32209,
+      "ttft_s": 3.49,
+      "pp_tok_s": 9229.3,
+      "completion_tokens": 512,
+      "decode_s": 5.233,
+      "tg_tok_s": 97.6
+    },
+    {
+      "prompt_tokens": 32217,
+      "ttft_s": 3.467,
+      "pp_tok_s": 9291.7,
+      "completion_tokens": 512,
+      "decode_s": 6.776,
+      "tg_tok_s": 75.4
+    },
+    {
+      "prompt_tokens": 32200,
+      "ttft_s": 3.449,
+      "pp_tok_s": 9335.8,
+      "completion_tokens": 512,
+      "decode_s": 5.324,
+      "tg_tok_s": 96.0
+    }
+  ],
+  "pp_tok_s": 9291.7,
+  "tg_tok_s": 96.0
+}
