@@ -29,7 +29,7 @@ benchmark to keep ratings comparable across them. The table is rebuilt automatic
 | [GLM-5.3-Flash · Mia EXL3 · TensorFold TP2](recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.toml) | EXL3 4bpw | low | 2× DGX Spark | 1,655 | 49.2 | [55.0%](benches/bfcl-100/recipes/glm-5.3-flash@exl3-4bpw-tensorfold-2xspark.md) | **1032** (926–1137) | 100/100 |
 | [GPT-6-Astra · Codex subscription proxy](recipes/gpt-6-astra@codex-proxy.toml) *(subscription proxy)* | cloud (Codex) | low | Codex OAuth proxy | - | - | [52.0%](benches/bfcl-100/recipes/gpt-6-astra@codex-proxy.md) | **1001** (895–1106) | 100/100 |
 
-Not shown as a column: [SciCode-10](benches/scicode-10/RESULTS.md) (not rated)
+Not shown as a column: [SciCode-10](benches/scicode-10/RESULTS.md) (not rated), [SciCode-10-v2](benches/scicode-10-v2/RESULTS.md) (rating)
 <!-- leaderboard:end -->
 
 ## Benchmarks
